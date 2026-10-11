@@ -18,17 +18,17 @@
 - [x] WP3 Masking utility (masking.py + tests/test_masking.py)
 - [x] WP4 Models (models.py; test_gate_zero, test_shapes, test_masking_behaviour)
 - [x] WP5 Training (train.py, engine.py, metrics.py; test_train_smoke incl. exact resume)
-- [ ] WP6 Evaluation
+- [x] WP6 Evaluation (evaluate.py, stats.py; tests/test_evaluate.py incl. sklearn agreement + final-test lock)
 - [ ] WP7 XAI
 - [ ] WP8 Kaggle runner
 - [ ] WP9 Team learning docs
 - [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
 
 ## In progress
-WP6 evaluation.
+WP7 XAI.
 
 ## Next action
-Write src/mamg/evaluate.py + stats.py + tests (metrics vs sklearn, bootstrap, final-test lock).
+Write src/mamg/xai_eval.py (Grad-CAM++, deletion/insertion AUC, efficiency) + tests/test_xai.py.
 
 ## Blockers
 None.

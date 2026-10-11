@@ -36,3 +36,6 @@ conservatively during the unsupervised overnight run; the team should confirm or
 - **Checkpoints are loaded with `torch.load(weights_only=False)`** because they also hold RNG states and the preprocessor; only ever load checkpoints this project produced.
 - **Focal loss is normalised by the sum of the class weights** (like weighted cross-entropy), so gamma=0 equals `F.cross_entropy(weight=w)` exactly (tested).
 - **Gate log** (`results/gate_log.csv`, gated model only) records per epoch: train gate mean/std, val gate mean/std, and the val gate mean with ALL metadata masked. A gate that does not drop when metadata is removed is evidence against the paper's claim; a std < 1e-3 or a mean outside (0.02, 0.98) prints a collapse warning.
+- **Rate 0 is evaluated once** (mask seed 0) — masking with rate 0 changes nothing, so repeating it over 5 seeds would only duplicate rows.
+- **Final-test lock is written before the evaluation starts**, keyed by checkpoint SHA-256 and run name, so even a crashed attempt counts. Re-running needs a deliberate, visible edit to `results/final_test_lock.csv`.
+- **Evaluate takes experiment settings from the checkpoint** and only paths/runtime from the current config, so a Kaggle-trained checkpoint can be evaluated on a laptop without config drift.
