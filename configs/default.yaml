@@ -38,9 +38,17 @@ data:
   excluded_fields: [biopsed]
   # Literal strings in the raw CSV that mean "not known"; treated as missing (index 0).
   missing_tokens: ["", "UNK", "unk", "NaN", "nan"]
+  # Spelling variants merged before encoding (raw value -> canonical value).
+  value_aliases: {BRASIL: BRAZIL}
+  # Rows used for training. In PAD-UFES-20 the 804 rows with the questionnaire block
+  # missing are ALL benign (ACK/NEV/SEK) - missingness is a label shortcut. See DECISIONS.md.
+  train_subset: all            # all | complete_metadata
+  # A row is "complete_metadata" if at most this many fields are missing (UNK in grew/changed is common).
+  complete_max_missing_fields: 2
 
 split:
   ratios: [0.70, 0.15, 0.15]   # train, val, test (by image count, grouped by patient)
+  n_folds: 20                  # StratifiedGroupKFold folds; ratios must be multiples of 1/n_folds
   seed: 42
   ratio_tolerance_real: 0.02   # asserted on the real dataset
   ratio_tolerance_synthetic: 0.08
@@ -98,6 +106,7 @@ eval:
   missingness_rates: [0.0, 0.1, 0.3, 0.5]
   mask_seeds: [0, 1, 2, 3, 4]
   mask_pool: all               # all | observed - pool of fields the masker samples from
+  subsets: [all, complete_metadata]   # evaluation reported separately on each subset
   bootstrap_resamples: 1000
   ci_level: 0.95
   bootstrap_seed: 12345

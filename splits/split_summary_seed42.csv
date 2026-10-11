@@ -1,0 +1,4 @@
+split,n_images,n_patients,n_lesions,frac_images,frac_complete_metadata,ACK,BCC,MEL,NEV,SCC,SEK
+train,1589,960,1151,0.6915,0.6249,501,556,39,175,140,178
+val,364,214,244,0.1584,0.6044,111,149,6,42,26,30
+test,345,199,246,0.1501,0.6725,118,140,7,27,26,27
