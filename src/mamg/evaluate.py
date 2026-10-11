@@ -156,7 +156,7 @@ def evaluate(ckpt_path: str | Path, current_cfg: dict | None = None, final_test:
                wall_clock_s=round(t.elapsed, 1), metrics_json=metrics)
     print(f"[{dirs['label']}] {run_name} on {split}: wrote {out_dir / (stem + '_sweep.csv')}")
     for _, r in summary[(summary.subset == "all") & (summary.metric == "macro_f1")].iterrows():
-        print(f"  missingness {r.missingness:.0%}: macro-F1 {r['mean']:.4f} ± {r['std']:.4f}")
+        print(f"  missingness {r.missingness:.0%}: macro-F1 {r['mean']:.4f} +/- {r['std']:.4f}")
     return {"tidy": tidy_df, "summary": summary, "out_dir": out_dir}
 
 
