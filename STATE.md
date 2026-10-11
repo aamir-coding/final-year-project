@@ -19,16 +19,16 @@
 - [x] WP4 Models (models.py; test_gate_zero, test_shapes, test_masking_behaviour)
 - [x] WP5 Training (train.py, engine.py, metrics.py; test_train_smoke incl. exact resume)
 - [x] WP6 Evaluation (evaluate.py, stats.py; tests/test_evaluate.py incl. sklearn agreement + final-test lock)
-- [ ] WP7 XAI
+- [x] WP7 XAI (xai_eval.py: Grad-CAM++, deletion/insertion AUC + random baseline, efficiency table; tests/test_xai.py)
 - [ ] WP8 Kaggle runner
 - [ ] WP9 Team learning docs
 - [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
 
 ## In progress
-WP7 XAI.
+WP8 Kaggle runner + WP9 docs (subagent), then WP10.
 
 ## Next action
-Write src/mamg/xai_eval.py (Grad-CAM++, deletion/insertion AUC, efficiency) + tests/test_xai.py.
+WP8/WP9 files (kaggle/, docs/, configs/kaggle.yaml) then WP10 hardening + leak hunt.
 
 ## Blockers
 None.
