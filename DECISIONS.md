@@ -1,0 +1,26 @@
+# DECISIONS.md
+
+One line (or a short paragraph) per choice, dated. `NEEDS HUMAN REVIEW` = taken
+conservatively during the unsupervised overnight run; the team should confirm or change it.
+
+## 2026-10-12 (overnight run, Claude Code)
+
+- **Playbook found** as `Building This Project With Claude Team 26PB67 Execution Playbook.md`. Used as reference; the overnight prompt wins on conflicts (listed below).
+- **Repo root = this folder** (playbook shows a `missingness-gating/` subfolder). Layout otherwise follows the playbook.
+- **Conflict (playbook vs prompt):** the playbook says Claude's container cannot reach Mendeley. On this machine it can, so the data was downloaded directly (SHA-256 verified against Mendeley's API).
+- **Conflict:** playbook test asks split ratios within 2%. Enforced on the real data (`split.ratio_tolerance_real`), looser 8% on the ~120-patient synthetic fixture where 2% is not achievable with grouping.
+- **Local torch is CPU-only** (disk had 17 GB free; CUDA wheels are ~5 GB installed). The laptop has a GTX 1650 (4 GB); anyone wanting local GPU debugging can `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126` in the venv.
+- **requirements.txt does not pin torch/torchvision** (Kaggle images ship a CUDA build; pinning would make pip replace it). Exact local versions are recorded in `requirements-lock.txt`. All other packages are pinned.
+- **`biopsed` excluded from features** — NEEDS HUMAN REVIEW. All BCC/MEL/SCC are biopsy-proven, so `biopsed=False` almost implies a benign label, and a biopsy result is not available at teledermatology triage time. Using it would inflate metadata models.
+- **Literal `UNK` treated as missing (index 0)** — NEEDS HUMAN REVIEW. Per invariant 2 ("unknown-as-a-real-category" must not be a category). The missingness profile reports NaN and UNK separately so the team can revisit.
+- **`fitspatrick` treated as categorical** (6 Fitzpatrick types, ordinal but few levels). `age`, `diameter_1`, `diameter_2` are continuous: standardised with train mean/std, mean-imputed (=0 after standardisation) plus an explicit missing flag.
+- **Index 0 has a learnable embedding** (not `padding_idx`), so the model can learn what "missing" means per field; it is never shared with any observed value.
+- **Image-global vector = mean of the 49 projected 256-d tokens** (after the 1x1 conv), shared by all four models through one `ImageEncoder`. This makes `fused = image_global + g*attn_out` dimensionally exact and lets the gate-zero test compare against a real `ImageOnly` model with copied weights.
+- **ImputeFusion = LateFusion architecture with mean/mode imputation and no indicators.** Missing categorical -> train mode index (inside the model, from buffers), missing continuous -> train mean, missing flags ignored. Same encoder width, same head, same training recipe — the only difference from LateFusion is missingness awareness.
+- **Modality dropout is applied to all three metadata models** (late, impute, gated), identically — NEEDS HUMAN REVIEW. Fair-comparison choice; a "gated without modality dropout" ablation is recommended later.
+- **Inference masking definition:** for rate r, each sample gets exactly `floor(r*F + 0.5)` of its F=21 metadata fields masked, drawn uniformly from all fields (`eval.mask_pool: all`), keyed by (mask_seed, crc32(img_id)) so it is independent of batch order/size. Already-missing fields can be drawn, so the *effective* missingness is also reported — NEEDS HUMAN REVIEW (alternative `mask_pool: observed` is implemented).
+- **"Minority-pair augmentation" interpreted as** oversampling intact (image, metadata) pairs of rare classes up to 50% of the largest class (max 4x), each copy getting independent random image augmentation; no synthetic tabular rows (no SMOTE). Class weights for the focal loss are computed from the effective (post-oversampling) training distribution so the two corrections do not double-count — NEEDS HUMAN REVIEW.
+- **Split algorithm:** union-find over patient_id and lesion_id gives groups; each group's stratum is its rarest class; within each stratum groups are shuffled (seeded) and assigned to train/val/test by cumulative image count. Split is saved to `splits/split_seed{N}.csv` and committed.
+- **Bootstrap CIs are patient-clustered** (resample patients, not images), because images of one patient are correlated — NEEDS HUMAN REVIEW (set `eval.bootstrap_group: null` for per-image).
+- **Malignant recall reported two ways:** `malignant_recall_macro` (mean recall of BCC/MEL/SCC) and `malignant_sensitivity` (malignant images predicted as any malignant class).
+- **AMP only on CUDA**; CPU runs in fp32.

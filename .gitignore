@@ -1,0 +1,23 @@
+# data and large artefacts
+data/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.zip
+# secrets
+.env
+kaggle.json
+**/kaggle.json
+# scratch / synthetic outputs (never results)
+tmp/
+tmp_*.log
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+build/
+dist/
+.ipynb_checkpoints/

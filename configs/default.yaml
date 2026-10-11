@@ -1,0 +1,121 @@
+# Missingness-Aware Multimodal Gating (MAMG) - default configuration.
+# Every tunable number lives here (invariant 8). Override on the CLI with
+#   --set train.lr=1e-4 --set model.pretrained=false
+# The `paths` and `runtime` sections are excluded from the config hash, so the
+# same experiment run on Kaggle and locally gets the same hash.
+
+seed: 42
+
+paths:
+  metadata_csv: data/raw/metadata.csv
+  image_dir: data/raw            # searched recursively for img_id files
+  image_cache_dir: data/processed  # optional resized cache (python -m mamg.prepare_data --cache-images)
+  splits_dir: splits
+  results_dir: results
+  checkpoints_dir: checkpoints
+  synthetic_results_dir: tmp/synthetic_runs   # where ALL outputs go if data is synthetic (invariant 9)
+
+runtime:
+  device: auto        # auto | cpu | cuda
+  num_workers: 2
+  max_train_steps: 0  # 0 = no limit; >0 only for smoke tests / pipeline checks
+  max_eval_steps: 0
+
+data:
+  kind: real          # real | synthetic (synthetic is also auto-detected from a marker file)
+  label_col: diagnostic
+  patient_col: patient_id
+  lesion_col: lesion_id
+  image_col: img_id
+  classes: [ACK, BCC, MEL, NEV, SCC, SEK]
+  malignant: [BCC, MEL, SCC]
+  # Metadata fields fed to the tabular branch. Order matters: categorical first, then continuous.
+  categorical_fields: [smoke, drink, background_father, background_mother, pesticide, gender,
+                       skin_cancer_history, cancer_history, has_piped_water, has_sewage_system,
+                       fitspatrick, region, itch, grew, hurt, changed, bleed, elevation]
+  continuous_fields: [age, diameter_1, diameter_2]
+  # Never used as features. biopsed is a label proxy (all BCC/MEL/SCC are biopsy-proven).
+  excluded_fields: [biopsed]
+  # Literal strings in the raw CSV that mean "not known"; treated as missing (index 0).
+  missing_tokens: ["", "UNK", "unk", "NaN", "nan"]
+
+split:
+  ratios: [0.70, 0.15, 0.15]   # train, val, test (by image count, grouped by patient)
+  seed: 42
+  ratio_tolerance_real: 0.02   # asserted on the real dataset
+  ratio_tolerance_synthetic: 0.08
+
+image:
+  size: 224
+  cache_short_side: 256
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  augment:
+    hflip_p: 0.5
+    vflip_p: 0.5
+    rotation_deg: 20
+    scale_min: 0.8             # RandomResizedCrop scale lower bound
+    color_jitter: 0.1
+
+model:
+  backbone: efficientnet_b0
+  pretrained: true
+  feature_channels: 1280
+  token_dim: 256               # 1x1 conv projects 1280 -> 256; also the fused dim
+  cat_embed_dim: 8             # per-field categorical embedding size
+  meta_hidden: 256
+  meta_layers: 3               # 3-layer MLP with GELU
+  meta_dim: 256                # tabular embedding size (must equal token_dim for the query)
+  attn_heads: 4
+  attn_dropout: 0.0
+  head_dropout: 0.2
+  gate_bias_init: 0.0          # sigmoid(0) = 0.5 at init
+
+train:
+  epochs: 40
+  batch_size: 32
+  lr: 3.0e-4
+  weight_decay: 1.0e-4
+  warmup_epochs: 1
+  min_lr_ratio: 0.01           # cosine floor = lr * min_lr_ratio
+  focal_gamma: 2.0
+  class_weighting: inverse_frequency   # inverse_frequency | none
+  amp: true                    # used only on CUDA
+  grad_clip_norm: 5.0
+  early_stopping_patience: 8
+  early_stopping_metric: macro_f1
+  modality_dropout:
+    enabled: true              # applied identically to every model that uses metadata
+    p_apply: 0.5               # probability a training sample gets any masking
+    rate_choices: [0.1, 0.3, 0.5, 0.7]
+    p_full_mask: 0.1           # probability a training sample loses ALL metadata
+  minority_pair_aug:
+    enabled: true              # oversample intact (image, metadata) pairs of rare classes; no SMOTE
+    target_fraction_of_max: 0.5
+    max_multiplier: 4
+
+eval:
+  missingness_rates: [0.0, 0.1, 0.3, 0.5]
+  mask_seeds: [0, 1, 2, 3, 4]
+  mask_pool: all               # all | observed - pool of fields the masker samples from
+  bootstrap_resamples: 1000
+  ci_level: 0.95
+  bootstrap_seed: 12345
+  bootstrap_group: patient_id  # cluster bootstrap over patients; set to null for per-image
+  batch_size: 64
+
+xai:
+  deletion_steps: 20
+  deletion_baseline: zero      # pixel value used for deleted pixels (after normalisation: 0 = channel mean)
+  insertion_baseline: blur
+  blur_kernel: 31
+  blur_sigma: 10.0
+  random_baseline_seed: 0
+  n_images: 100                # images per (model, missingness) for the XAI sweep
+  target_layer: bn2            # last conv block of the timm EfficientNet
+
+efficiency:
+  latency_batch_size: 1
+  latency_warmup: 5
+  latency_runs: 30
+  threads: 1
