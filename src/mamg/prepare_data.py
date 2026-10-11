@@ -13,10 +13,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import pandas as pd
 from PIL import Image
 
 from .config import load_config, output_dirs
-from .data import (build_image_index, load_metadata, missingness_by_class, missingness_profile,
+from .data import (assert_no_overlap, build_image_index, load_metadata, missingness_by_class, missingness_profile,
                    patient_level_split, split_path, split_summary, split_to_frame)
 
 EXPECTED_REAL = {"rows": 2298, "patients": 1373, "lesions": 1641}
@@ -77,6 +78,15 @@ def main(argv=None) -> None:
     splits = patient_level_split(df, cfg["split"]["ratios"], seed, cfg["split"]["n_folds"])  # asserts zero overlap
     if sp.exists() and not a.force_split:
         print(f"split file exists, not overwritten: {sp} (use --force-split)")
+        saved = pd.read_csv(sp, dtype=str, keep_default_na=False)
+        img = d["image_col"]
+        saved_splits = {n: df.index[df[img].isin(saved.loc[saved["split"] == n, img])].to_numpy()
+                        for n in ("train", "val", "test")}
+        assert_no_overlap(df, saved_splits, d["patient_col"], d["lesion_col"], img)
+        if any(set(saved_splits[n]) != set(splits[n]) for n in splits):
+            print("WARNING: recomputing the split now gives a different assignment than the saved file "
+                  "(e.g. a different sklearn version). The SAVED file is used everywhere.")
+        splits = saved_splits
     else:
         sp.parent.mkdir(parents=True, exist_ok=True)
         split_to_frame(df, splits, cfg).to_csv(sp, index=False)

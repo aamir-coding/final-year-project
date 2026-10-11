@@ -1,8 +1,8 @@
 # Missingness-Aware Multimodal Gating (MAMG) - default configuration.
 # Every tunable number lives here (invariant 8). Override on the CLI with
 #   --set train.lr=1e-4 --set model.pretrained=false
-# The `paths` and `runtime` sections and the seed are excluded from the config hash, so
-# the same experiment run on Kaggle and locally (any seed) gets the same hash.
+# The config hash identifies what is TRAINED: it excludes `paths`, `runtime`, `seed` and
+# the evaluation-only sections (`eval`, `xai`, `efficiency`).
 
 seed: 42
 
@@ -122,6 +122,7 @@ xai:
   blur_sigma: 10.0
   random_baseline_seed: 0
   n_images: 100                # images per (model, missingness) for the XAI sweep
+  sample_seed: 0               # seeded random sample of validation images (same images for every model)
   target_layer: bn2            # last conv block of the timm EfficientNet
 
 efficiency:

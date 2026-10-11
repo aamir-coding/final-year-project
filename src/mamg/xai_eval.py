@@ -28,7 +28,7 @@ import torchvision.transforms.functional as TF
 from .config import load_config, metadata_fields, output_dirs
 from .data import TabularPreprocessor, load_metadata, load_split
 from .engine import build_pipeline, ensure_split
-from .evaluate import load_checkpoint_cfg
+from .evaluate import load_checkpoint_cfg, resolve_ckpt
 from .masking import apply_field_mask, keyed_field_mask, observed_fields
 from .models import MODEL_NAMES, build_model, gradcam_target_layer
 from .utils import append_run, get_device, set_seed
@@ -116,12 +116,13 @@ def xai_sweep(ckpt_path: str | Path, current_cfg: dict | None = None, rates=None
     from pytorch_grad_cam import GradCAMPlusPlus
     from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
+    ckpt_path = resolve_ckpt(ckpt_path)
     ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)  # own checkpoints only
     cfg = load_checkpoint_cfg(ck, current_cfg)
     dirs, xcfg, ev = output_dirs(cfg), cfg["xai"], cfg["eval"]
     set_seed(int(ck["seed"]))
     device = get_device(cfg["runtime"]["device"])
-    pipe = build_pipeline(cfg, need=("val",), pre_state=ck["preprocessor"])
+    pipe = build_pipeline(cfg, need=("val",), pre_state=ck["preprocessor"], apply_train_subset=False)
     ds = pipe.datasets["val"]
     model = build_model(ck["model_name"], cfg, pipe.pre.cat_cardinalities, len(pipe.pre.continuous),
                         cat_modes=pipe.pre.cat_modes)
@@ -130,11 +131,12 @@ def xai_sweep(ckpt_path: str | Path, current_cfg: dict | None = None, rates=None
     wrapper = FixedMetadata(model).eval()
     rates = list(ev["missingness_rates"] if rates is None else rates)
     n_img = min(int(xcfg["n_images"]), len(ds))
+    sample = np.sort(np.random.default_rng(int(xcfg["sample_seed"])).permutation(len(ds))[:n_img])
     mask_seed = int(ev["mask_seeds"][0])
     rows, curves = [], []
     with GradCAMPlusPlus(model=wrapper, target_layers=[gradcam_target_layer(model, cfg)]) as cam:
         for rate in rates:
-            for i in range(n_img):
+            for i in sample.tolist():
                 s = ds[i]
                 image = s["image"].unsqueeze(0).to(device)
                 cat, cont, cmiss = (s[k].unsqueeze(0).to(device) for k in ("cat", "cont", "cont_missing"))

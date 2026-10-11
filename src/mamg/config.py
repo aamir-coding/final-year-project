@@ -9,9 +9,10 @@ from typing import Any, Iterable
 
 import yaml
 
-# Sections that describe *where* things are, not *what* the experiment is. The seed is
-# excluded too, so every seed of one experiment shares a hash (run names carry the seed).
-HASH_EXCLUDED_SECTIONS = ("paths", "runtime", "seed")
+# Sections that do not change what gets TRAINED: where things are (paths, runtime) and
+# evaluation-only settings (eval, xai, efficiency). The seed is excluded too, so every
+# seed of one experiment shares a hash (run names carry the seed).
+HASH_EXCLUDED_SECTIONS = ("paths", "runtime", "seed", "eval", "xai", "efficiency")
 SYNTHETIC_MARKER = "SYNTHETIC_DATA_MARKER"
 
 

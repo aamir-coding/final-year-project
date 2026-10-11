@@ -28,7 +28,11 @@ class Pipeline:
 
 def ensure_split(cfg: dict, df: pd.DataFrame) -> Path:
     """Return the split file for cfg.split.seed, creating it if absent (deterministic)."""
-    sp = split_path(output_dirs(cfg)["splits"], int(cfg["split"]["seed"]))
+    dirs = output_dirs(cfg)
+    sp = split_path(dirs["splits"], int(cfg["split"]["seed"]))
+    if not sp.exists() and dirs["label"] == "REAL":
+        raise FileNotFoundError(f"{sp} not found. Run `python -m mamg.prepare_data` from the repo root "
+                                "(real-data splits are committed, never silently regenerated).")
     if not sp.exists():
         splits = patient_level_split(df, cfg["split"]["ratios"], int(cfg["split"]["seed"]),
                                      int(cfg["split"]["n_folds"]))
@@ -47,15 +51,16 @@ def subset_mask(df: pd.DataFrame, idx: np.ndarray, subset: str) -> np.ndarray:
 
 
 def build_pipeline(cfg: dict, need=("train", "val"), allow_test: bool = False,
-                   pre_state: dict | None = None, train_aug: bool = True) -> Pipeline:
+                   pre_state: dict | None = None, train_aug: bool = True,
+                   apply_train_subset: bool = True) -> Pipeline:
     """Load metadata + split, fit (train-only) or restore the preprocessor, build datasets.
-    `train_subset` applies to train and val (the model-selection data); evaluation
-    reports both subsets separately."""
+    `train_subset` applies to train and val during training (the model-selection data);
+    evaluation passes apply_train_subset=False and reports every subset separately."""
     df = load_metadata(cfg)
     sp = ensure_split(cfg, df)
     split_df = pd.read_csv(sp, dtype=str, keep_default_na=False)
     idx = {n: load_split(df, split_df, n, cfg, allow_test=allow_test) for n in need}
-    sub = cfg["data"].get("train_subset", "all")
+    sub = cfg["data"].get("train_subset", "all") if apply_train_subset else "all"
     for n in ("train", "val"):
         if n in idx:
             idx[n] = subset_mask(df, idx[n], sub)

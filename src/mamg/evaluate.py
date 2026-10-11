@@ -34,6 +34,17 @@ from .utils import Timer, append_run, get_device
 LOCK_COLUMNS = ["timestamp_utc", "checkpoint_sha256", "checkpoint", "run_name"]
 
 
+def resolve_ckpt(pattern: str | Path) -> Path:
+    """Accept a path or a glob such as 'checkpoints/gated_s1_*/best.pt' (exactly one match)."""
+    pattern = str(pattern)
+    if any(ch in pattern for ch in "*?["):
+        hits = sorted(Path().glob(pattern))
+        if len(hits) != 1:
+            raise SystemExit(f"--ckpt {pattern!r} matched {len(hits)} files; it must match exactly one")
+        return hits[0]
+    return Path(pattern)
+
+
 def file_sha256(path: str | Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -75,7 +86,7 @@ def load_checkpoint_cfg(ckpt: dict, current_cfg: dict | None) -> dict:
 
 def evaluate(ckpt_path: str | Path, current_cfg: dict | None = None, final_test: bool = False,
              rates=None, mask_seeds=None) -> dict:
-    ckpt_path = Path(ckpt_path)
+    ckpt_path = resolve_ckpt(ckpt_path)
     ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)  # own checkpoints only
     cfg = load_checkpoint_cfg(ck, current_cfg)
     dirs = output_dirs(cfg)
@@ -90,7 +101,8 @@ def evaluate(ckpt_path: str | Path, current_cfg: dict | None = None, final_test:
     rates = list(ev["missingness_rates"] if rates is None else rates)
     mask_seeds = list(ev["mask_seeds"] if mask_seeds is None else mask_seeds)
     device = get_device(cfg["runtime"]["device"])
-    pipe = build_pipeline(cfg, need=(split,), allow_test=final_test, pre_state=ck["preprocessor"])
+    pipe = build_pipeline(cfg, need=(split,), allow_test=final_test, pre_state=ck["preprocessor"],
+                          apply_train_subset=False)
     ds = pipe.datasets[split]
     loader = make_loader(ds, cfg, int(ev["batch_size"]))
     model = build_model(model_name, cfg, pipe.pre.cat_cardinalities, len(pipe.pre.continuous),
@@ -104,6 +116,7 @@ def evaluate(ckpt_path: str | Path, current_cfg: dict | None = None, final_test:
     subset_rows = {"all": np.arange(len(ds)),
                    "complete_metadata": np.flatnonzero(sub_df["complete_metadata"].to_numpy())}
     metric_fn = lambda yt, yp: compute_metrics(yt, yp, classes, malignant)  # noqa: E731
+    ci_keys = HEADLINE + tuple(f"recall_{c}" for c in classes)
 
     tidy, pred_frames = [], []
     with Timer() as t:
@@ -120,7 +133,7 @@ def evaluate(ckpt_path: str | Path, current_cfg: dict | None = None, final_test:
                     yt, yp = out["y_true"][keep], out["y_pred"][keep]
                     groups = groups_all[order[keep]] if groups_all is not None else None
                     point = metric_fn(yt, yp)
-                    cis = bootstrap_metrics(yt, yp, metric_fn, HEADLINE, int(ev["bootstrap_resamples"]),
+                    cis = bootstrap_metrics(yt, yp, metric_fn, ci_keys, int(ev["bootstrap_resamples"]),
                                             float(ev["ci_level"]), int(ev["bootstrap_seed"]), groups)
                     extra = {"gate_mean": float(np.nanmean(out["gate"][keep])) if model_name == "gated" else np.nan,
                              "effective_missing_ratio": float(out["missing_ratio"][keep].mean())}
@@ -163,7 +176,7 @@ def evaluate(ckpt_path: str | Path, current_cfg: dict | None = None, final_test:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", default="configs/default.yaml", help="supplies paths/runtime only")
-    ap.add_argument("--ckpt", required=True)
+    ap.add_argument("--ckpt", required=True, help="path or quoted glob matching exactly one checkpoint")
     ap.add_argument("--final-test", action="store_true", help="evaluate the TEST split (once per checkpoint)")
     ap.add_argument("--missingness", default=None, help="comma list of percents, e.g. 0,10,30,50")
     ap.add_argument("--set", action="append", default=[])
