@@ -15,7 +15,7 @@
 ## Work packages
 - [x] WP1 Scaffold
 - [x] WP2 Data layer (data.py, prepare_data.py, synthetic fixture, split + preprocessing tests)
-- [ ] WP3 Masking utility
+- [x] WP3 Masking utility (masking.py + tests/test_masking.py)
 - [ ] WP4 Models
 - [ ] WP5 Training
 - [ ] WP6 Evaluation
@@ -25,10 +25,10 @@
 - [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
 
 ## In progress
-WP3 masking.
+WP4 models.
 
 ## Next action
-Write src/mamg/masking.py + tests/test_masking.py.
+Write src/mamg/models.py + test_gate_zero, test_shapes, test_masking_behaviour.
 
 ## Blockers
 None.
