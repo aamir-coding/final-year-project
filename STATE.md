@@ -16,7 +16,7 @@
 - [x] WP1 Scaffold
 - [x] WP2 Data layer (data.py, prepare_data.py, synthetic fixture, split + preprocessing tests)
 - [x] WP3 Masking utility (masking.py + tests/test_masking.py)
-- [ ] WP4 Models
+- [x] WP4 Models (models.py; test_gate_zero, test_shapes, test_masking_behaviour)
 - [ ] WP5 Training
 - [ ] WP6 Evaluation
 - [ ] WP7 XAI
@@ -25,10 +25,10 @@
 - [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
 
 ## In progress
-WP4 models.
+WP5 training.
 
 ## Next action
-Write src/mamg/models.py + test_gate_zero, test_shapes, test_masking_behaviour.
+Write src/mamg/train.py (+ losses) and the synthetic CPU smoke test (train 2 epochs, resume).
 
 ## Blockers
 None.
