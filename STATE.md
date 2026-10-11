@@ -17,7 +17,7 @@
 - [x] WP2 Data layer (data.py, prepare_data.py, synthetic fixture, split + preprocessing tests)
 - [x] WP3 Masking utility (masking.py + tests/test_masking.py)
 - [x] WP4 Models (models.py; test_gate_zero, test_shapes, test_masking_behaviour)
-- [ ] WP5 Training
+- [x] WP5 Training (train.py, engine.py, metrics.py; test_train_smoke incl. exact resume)
 - [ ] WP6 Evaluation
 - [ ] WP7 XAI
 - [ ] WP8 Kaggle runner
@@ -25,10 +25,10 @@
 - [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
 
 ## In progress
-WP5 training.
+WP6 evaluation.
 
 ## Next action
-Write src/mamg/train.py (+ losses) and the synthetic CPU smoke test (train 2 epochs, resume).
+Write src/mamg/evaluate.py + stats.py + tests (metrics vs sklearn, bootstrap, final-test lock).
 
 ## Blockers
 None.

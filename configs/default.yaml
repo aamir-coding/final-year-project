@@ -1,8 +1,8 @@
 # Missingness-Aware Multimodal Gating (MAMG) - default configuration.
 # Every tunable number lives here (invariant 8). Override on the CLI with
 #   --set train.lr=1e-4 --set model.pretrained=false
-# The `paths` and `runtime` sections are excluded from the config hash, so the
-# same experiment run on Kaggle and locally gets the same hash.
+# The `paths` and `runtime` sections and the seed are excluded from the config hash, so
+# the same experiment run on Kaggle and locally (any seed) gets the same hash.
 
 seed: 42
 
@@ -20,6 +20,7 @@ runtime:
   num_workers: 2
   max_train_steps: 0  # 0 = no limit; >0 only for smoke tests / pipeline checks
   max_eval_steps: 0
+  interrupt_after_epoch: -1   # >=0 simulates a crash after that epoch (used by the resume test)
 
 data:
   kind: real          # real | synthetic (synthetic is also auto-detected from a marker file)
