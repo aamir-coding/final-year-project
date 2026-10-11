@@ -25,10 +25,10 @@
 - [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
 
 ## In progress
-WP8 Kaggle runner + WP9 docs (subagent), then WP10.
+WP10: independent leak hunt (Opus subagent) running; fix findings, then MORNING_REPORT.md.
 
 ## Next action
-WP8/WP9 files (kaggle/, docs/, configs/kaggle.yaml) then WP10 hardening + leak hunt.
+Apply leak-hunt fixes, run pytest -q, write MORNING_REPORT.md, append ALL_DONE.
 
 ## Blockers
 None.
