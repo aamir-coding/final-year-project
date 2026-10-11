@@ -20,8 +20,8 @@
 - [x] WP5 Training (train.py, engine.py, metrics.py; test_train_smoke incl. exact resume)
 - [x] WP6 Evaluation (evaluate.py, stats.py; tests/test_evaluate.py incl. sklearn agreement + final-test lock)
 - [x] WP7 XAI (xai_eval.py: Grad-CAM++, deletion/insertion AUC + random baseline, efficiency table; tests/test_xai.py)
-- [ ] WP8 Kaggle runner
-- [ ] WP9 Team learning docs
+- [x] WP8 Kaggle runner (kaggle/kernel-metadata.json, runner.ipynb, README.md, configs/kaggle.yaml)
+- [x] WP9 Team learning docs (docs/WALKTHROUGH.md, docs/CLAIMS_GUARDRAIL.md)
 - [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
 
 ## In progress

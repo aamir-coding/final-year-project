@@ -1,0 +1,13 @@
+{
+  "id": "<kaggle-username>/mamg-train",
+  "title": "mamg-train",
+  "code_file": "runner.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["<kaggle-username>/pad-ufes-20"],
+  "competition_sources": [],
+  "kernel_sources": []
+}

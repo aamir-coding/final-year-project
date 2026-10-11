@@ -1,0 +1,18 @@
+_base_: default.yaml            # inherit every setting from default.yaml (deep-merged; only keys below change)
+# Kaggle overrides. The notebook does `%cd /kaggle/working/repo`, so results_dir,
+# checkpoints_dir and splits_dir (relative paths in default.yaml) resolve inside the clone
+# and splits/split_seed42.csv from the repo is reused. Nothing here changes the experiment:
+# `paths` and `runtime` are excluded from the config hash (src/mamg/config.py).
+
+paths:
+  metadata_csv: /kaggle/input/pad-ufes-20/metadata.csv   # file in the private Kaggle dataset
+  image_dir: /kaggle/input/pad-ufes-20                   # searched recursively; upload the RESIZED cache (data/processed) as images/
+  image_cache_dir: ""                                    # the uploaded images already are the cache
+  synthetic_results_dir: tmp/synthetic_runs              # unchanged; synthetic output never goes to results/
+
+runtime:
+  device: cuda                  # fail loudly if the kernel has no GPU instead of silently using the CPU
+  num_workers: 2                # Kaggle kernels have 4 CPU cores
+  max_train_steps: 0            # 0 = full epochs (no smoke-test limit)
+  max_eval_steps: 0             # 0 = evaluate on the whole split
+  interrupt_after_epoch: -1     # -1 = never simulate a crash (test-only option)
