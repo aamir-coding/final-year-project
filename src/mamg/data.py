@@ -26,7 +26,34 @@ from .config import metadata_fields
 SPLIT_NAMES = ("train", "val", "test")
 
 
+class LeakError(AssertionError):
+    """Raised (never via a bare `assert`, so it survives `python -O`) when a split leaks."""
+
+
 # --------------------------------------------------------------------------- schema
+def missing_mask(s: pd.Series, tokens) -> pd.Series:
+    """True where a raw value means 'not recorded' (case-insensitive match on tokens)."""
+    up = {str(t).strip().upper() for t in tokens}
+    return s.astype(str).str.strip().str.upper().isin(up)
+
+
+def canonical_category(s: pd.Series) -> pd.Series:
+    """Canonical spelling of categorical values: numbers in one float format ('2' and
+    '2.0' -> '2.0'), everything else upper-case ('True' -> 'TRUE'). Missing stays ''."""
+    def canon(v) -> str:
+        v = str(v).strip()
+        if v == "":
+            return v
+        try:
+            f = float(v)
+            if np.isfinite(f):
+                return repr(f)
+        except ValueError:
+            pass
+        return v.upper()
+    return s.map(canon)
+
+
 def required_columns(cfg: dict) -> list[str]:
     d = cfg["data"]
     cat, cont = metadata_fields(cfg)
@@ -54,8 +81,7 @@ def load_metadata(cfg: dict, path: str | Path | None = None) -> pd.DataFrame:
         raise ValueError("duplicate img_id rows in metadata")
     df["label"] = df[d["label_col"]].map({c: i for i, c in enumerate(d["classes"])}).astype(int)
     df["group_id"] = assign_groups(df, d["patient_col"], d["lesion_col"])
-    tokens = set(d["missing_tokens"])
-    df["n_missing_fields"] = sum(df[f].isin(tokens).astype(int) for f in cat + cont)
+    df["n_missing_fields"] = sum(missing_mask(df[f], d["missing_tokens"]).astype(int) for f in cat + cont)
     df["complete_metadata"] = df["n_missing_fields"] <= int(d["complete_max_missing_fields"])
     return df.reset_index(drop=True)
 
@@ -83,19 +109,20 @@ def assign_groups(df: pd.DataFrame, patient_col: str, lesion_col: str) -> np.nda
 
 
 def missingness_profile(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
-    """Per-field missingness on the RAW metadata (empty string vs literal UNK reported apart)."""
+    """Per-field missingness on the RAW metadata. 'Missing' = not recorded (empty).
+    The literal answer 'UNK' (patient did not know) is a real category, reported apart."""
     cat, cont = metadata_fields(cfg)
-    tokens = set(cfg["data"]["missing_tokens"])
+    tokens = cfg["data"]["missing_tokens"]
     rows = []
     for f in cat + cont:
         s = df[f]
-        n_empty = int((s == "").sum())
-        n_unk = int((s.isin(tokens) & (s != "")).sum())
+        miss = missing_mask(s, tokens)
+        n_unk = int((s.str.upper() == "UNK").sum())
         rows.append({
             "field": f, "type": "categorical" if f in cat else "continuous", "n_rows": len(s),
-            "n_empty": n_empty, "n_unk": n_unk, "n_missing": n_empty + n_unk,
-            "missing_rate": round((n_empty + n_unk) / len(s), 4),
-            "n_observed_categories": int(s[~s.isin(tokens)].nunique()) if f in cat else "",
+            "n_missing": int(miss.sum()), "missing_rate": round(float(miss.mean()), 4),
+            "n_unk_answer": n_unk, "unk_answer_rate": round(n_unk / len(s), 4),
+            "n_observed_categories": int(canonical_category(s[~miss]).nunique()) if f in cat else "",
         })
     return pd.DataFrame(rows)
 
@@ -103,7 +130,7 @@ def missingness_profile(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 def missingness_by_class(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     """Missing rate per field per diagnosis: exposes missingness that predicts the label."""
     cat, cont = metadata_fields(cfg)
-    tokens = set(cfg["data"]["missing_tokens"])
+    tokens = cfg["data"]["missing_tokens"]
     lab = cfg["data"]["label_col"]
     out = []
     for c in cfg["data"]["classes"]:
@@ -111,7 +138,7 @@ def missingness_by_class(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
         row = {"class": c, "n_images": len(sub),
                "frac_complete_metadata": round(float(sub["complete_metadata"].mean()), 4)}
         for f in cat + cont:
-            row[f] = round(float(sub[f].isin(tokens).mean()), 4)
+            row[f] = round(float(missing_mask(sub[f], tokens).mean()), 4)
         out.append(row)
     return pd.DataFrame(out)
 
@@ -119,8 +146,8 @@ def missingness_by_class(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 # --------------------------------------------------------------------------- split
 def patient_level_split(df: pd.DataFrame, ratios: Sequence[float], seed: int,
                         n_folds: int = 20, label_col: str = "label", group_col: str = "group_id",
-                        patient_col: str = "patient_id", lesion_col: str = "lesion_id"
-                        ) -> dict[str, np.ndarray]:
+                        patient_col: str = "patient_id", lesion_col: str = "lesion_id",
+                        image_col: str = "img_id") -> dict[str, np.ndarray]:
     """Grouped, class-stratified train/val/test split.
 
     Groups (connected patient/lesion components) are never divided. The data are cut
@@ -143,25 +170,29 @@ def patient_level_split(df: pd.DataFrame, ratios: Sequence[float], seed: int,
     edges = np.cumsum(np.round(fold_counts).astype(int))[:2]
     split_idx = np.searchsorted(edges, fold, side="right")
     out = {name: np.flatnonzero(split_idx == i) for i, name in enumerate(SPLIT_NAMES)}
-    assert_no_overlap(df, out, patient_col=patient_col, lesion_col=lesion_col)
+    assert_no_overlap(df, out, patient_col=patient_col, lesion_col=lesion_col, image_col=image_col)
     return out
 
 
 def assert_no_overlap(df: pd.DataFrame, splits: dict[str, np.ndarray],
                       patient_col: str = "patient_id", lesion_col: str = "lesion_id",
                       image_col: str = "img_id") -> None:
-    """Invariant 1: no patient, lesion or image in more than one split."""
+    """Invariant 1: no patient, lesion or image in more than one split. `splits` holds
+    POSITIONAL row indices. Raises LeakError (not a bare assert, so `python -O` cannot
+    skip it); a missing identity column is an error, never silently skipped."""
     names = list(splits)
     for col in (patient_col, lesion_col, image_col):
         if col not in df.columns:
-            continue
-        sets = {n: set(df.iloc[splits[n]][col]) for n in names}
+            raise KeyError(f"identity column {col!r} missing; cannot check split overlap")
+        sets = {n: set(df[col].iloc[np.asarray(splits[n])].astype(str).str.strip()) for n in names}
         for i, a in enumerate(names):
             for b in names[i + 1:]:
                 inter = sets[a] & sets[b]
-                assert not inter, f"LEAK: {len(inter)} {col} values in both {a} and {b}, e.g. {sorted(inter)[:3]}"
-    all_idx = np.concatenate([splits[n] for n in names])
-    assert len(all_idx) == len(set(all_idx.tolist())), "LEAK: a row is assigned to two splits"
+                if inter:
+                    raise LeakError(f"LEAK: {len(inter)} {col} values in both {a} and {b}, e.g. {sorted(inter)[:3]}")
+    all_idx = np.concatenate([np.asarray(splits[n]) for n in names])
+    if len(all_idx) != len(set(all_idx.tolist())):
+        raise LeakError("LEAK: a row is assigned to two splits")
 
 
 def split_to_frame(df: pd.DataFrame, splits: dict[str, np.ndarray], cfg: dict) -> pd.DataFrame:
@@ -201,12 +232,12 @@ def load_split(df: pd.DataFrame, split_df: pd.DataFrame, name: str, cfg: dict,
     allow_test=True, which only the final-evaluation command passes (invariant 5)."""
     if name not in SPLIT_NAMES:
         raise ValueError(name)
-    if name == "test" and not allow_test:
+    if name == "test" and allow_test is not True:  # strict: the string "False" must not pass
         raise PermissionError("The test split is reserved for `mamg.evaluate --final-test`.")
     d = cfg["data"]
     # Re-check overlap on every load, from the file itself.
-    by_split = {n: df.index[df[d["image_col"]].isin(split_df.loc[split_df["split"] == n, d["image_col"]])].to_numpy()
-                for n in SPLIT_NAMES}
+    by_split = {n: np.flatnonzero(df[d["image_col"]].isin(split_df.loc[split_df["split"] == n, d["image_col"]]).to_numpy())
+                for n in SPLIT_NAMES}  # positional indices
     assert_no_overlap(df, by_split, d["patient_col"], d["lesion_col"], d["image_col"])
     n_assigned = sum(len(v) for v in by_split.values())
     if n_assigned != len(df):
@@ -218,7 +249,8 @@ def load_split(df: pd.DataFrame, split_df: pd.DataFrame, name: str, cfg: dict,
 class TabularPreprocessor:
     """Encodes metadata fields. Fit on TRAIN rows only (invariant 4).
 
-    categorical: observed values -> 1..K (sorted, deterministic); missing/UNK/unseen -> 0.
+    categorical: canonicalised observed values -> 1..K (sorted, deterministic), including
+                 the real answer "UNK"; not-recorded and unseen-in-train values -> 0.
     continuous : z-score with train mean/std; missing -> train mean (= 0 after scaling)
                  plus an explicit missing flag (1 = missing).
     """
@@ -232,19 +264,24 @@ class TabularPreprocessor:
 
     # -- helpers
     def _is_missing(self, s: pd.Series) -> np.ndarray:
-        return s.isin(self.missing_tokens).to_numpy()
+        return missing_mask(s, self.missing_tokens).to_numpy()
+
+    def _categories(self, s: pd.Series) -> pd.Series:
+        """Canonical category strings; missing values become '' (never in the vocab)."""
+        return canonical_category(s).where(~missing_mask(s, self.missing_tokens), "")
 
     def _to_float(self, s: pd.Series) -> tuple[np.ndarray, np.ndarray]:
-        vals = pd.to_numeric(s.where(~s.isin(self.missing_tokens)), errors="coerce").to_numpy(dtype=float)
-        miss = ~np.isfinite(vals)
-        return vals, miss
+        vals = pd.to_numeric(s.where(~missing_mask(s, self.missing_tokens)), errors="coerce").to_numpy(dtype=float)
+        # non-numeric, non-finite, or too large for float32 -> treated as missing
+        miss = ~np.isfinite(vals) | (np.abs(np.nan_to_num(vals)) > np.finfo(np.float32).max)
+        return np.where(miss, np.nan, vals), miss
 
     def fit(self, train_df: pd.DataFrame) -> "TabularPreprocessor":
         self.vocab: dict[str, dict[str, int]] = {}
         self.cat_modes: list[int] = []
         for f in self.categorical:
-            s = train_df[f]
-            obs = s[~self._is_missing(s)]
+            s = self._categories(train_df[f])
+            obs = s[s != ""]
             values = sorted(obs.unique().tolist())
             self.vocab[f] = {v: i + 1 for i, v in enumerate(values)}  # 0 reserved for missing
             self.cat_modes.append(self.vocab[f][obs.value_counts().sort_index().idxmax()] if len(obs) else 0)
@@ -274,12 +311,12 @@ class TabularPreprocessor:
         n = len(df)
         cat = np.zeros((n, len(self.categorical)), dtype=np.int64)
         for j, f in enumerate(self.categorical):
-            cat[:, j] = df[f].map(self.vocab[f]).fillna(0).astype(np.int64).to_numpy()
+            cat[:, j] = self._categories(df[f]).map(self.vocab[f]).fillna(0).astype(np.int64).to_numpy()
         cont = np.zeros((n, len(self.continuous)), dtype=np.float32)
         cont_missing = np.zeros_like(cont)
         for j, f in enumerate(self.continuous):
             vals, miss = self._to_float(df[f])
-            z = (vals - self.cont_mean[j]) / self.cont_std[j]
+            z = (np.where(miss, self.cont_mean[j], vals) - self.cont_mean[j]) / self.cont_std[j]
             z[miss] = 0.0  # mean imputation in standardised units
             cont[:, j] = z
             cont_missing[:, j] = miss

@@ -5,9 +5,9 @@ import pytest
 from conftest import real_data
 
 from mamg.data import (TabularPreprocessor, class_weights, load_metadata, minority_oversample,
-                       patient_level_split)
+                       missing_mask, patient_level_split)
 
-TOKENS = ["", "UNK", "unk", "NaN", "nan"]
+TOKENS = ["", "NaN", "NA", "None"]
 
 
 def _pre():
@@ -15,14 +15,25 @@ def _pre():
 
 
 def test_missing_is_never_no():
-    train = pd.DataFrame({"smoke": ["False", "True", "", "UNK"], "region": ["FACE"] * 4,
-                          "age": ["40", "60", "", "50"]})
+    train = pd.DataFrame({"smoke": ["False", "True", "", "UNK", "nan"], "region": ["FACE"] * 5,
+                          "age": ["40", "60", "", "50", "45"]})
     p = _pre().fit(train)
     enc = p.transform(train)["cat"][:, 0]
-    assert enc[2] == 0 and enc[3] == 0, "empty and UNK must map to reserved index 0"
+    assert enc[2] == 0 and enc[4] == 0, "not-recorded values map to reserved index 0"
     assert enc[0] >= 1 and enc[1] >= 1 and enc[0] != enc[1], "False/True are real categories"
-    assert 0 not in p.vocab["smoke"].values()
-    assert "UNK" not in p.vocab["smoke"] and "" not in p.vocab["smoke"]
+    assert enc[3] >= 1 and enc[3] not in (enc[0], enc[1]), "UNK (patient did not know) is its own category"
+    assert 0 not in p.vocab["smoke"].values() and "" not in p.vocab["smoke"]
+
+
+def test_canonical_spellings_and_non_finite_numbers():
+    train = pd.DataFrame({"smoke": ["True", "False"], "region": ["2.0", "3.0"], "age": ["40", "60"]})
+    p = _pre().fit(train)
+    val = pd.DataFrame({"smoke": ["TRUE", " false "], "region": ["2", " 3.0"], "age": ["1e40", "inf"]})
+    out = p.transform(val)
+    assert out["cat"][0, 0] == p.vocab["smoke"]["TRUE"] and out["cat"][1, 0] == p.vocab["smoke"]["FALSE"]
+    assert out["cat"][0, 1] == p.vocab["region"]["2.0"] and out["cat"][1, 1] == p.vocab["region"]["3.0"]
+    assert np.isfinite(out["cont"]).all(), "overflowing / infinite numbers are treated as missing"
+    assert (out["cont_missing"][:, 0] == 1).all()
 
 
 def test_fit_uses_train_only_and_unseen_maps_to_zero():
@@ -44,7 +55,7 @@ def test_mode_and_state_roundtrip():
     train = pd.DataFrame({"smoke": ["False", "False", "True", ""], "region": ["FACE"] * 4,
                           "age": ["1", "2", "3", "4"]})
     p = _pre().fit(train)
-    assert p.cat_modes[0] == p.vocab["smoke"]["False"]
+    assert p.cat_modes[0] == p.vocab["smoke"]["FALSE"]
     q = TabularPreprocessor.from_state_dict(p.state_dict())
     for k, v in p.transform(train).items():
         np.testing.assert_array_equal(v, q.transform(train)[k])
@@ -88,9 +99,11 @@ def test_real_booleans_never_zero(base_cfg):
     df, s, p = _fit_on_train(base_cfg)
     enc = p.transform(df)
     for j, f in enumerate(p.categorical):
-        observed = (~df[f].isin(base_cfg["data"]["missing_tokens"])).to_numpy()
-        in_vocab = df[f].isin(list(p.vocab[f])).to_numpy()
+        observed = (~missing_mask(df[f], base_cfg["data"]["missing_tokens"])).to_numpy()
+        in_vocab = p._categories(df[f]).isin(list(p.vocab[f])).to_numpy()
+        assert in_vocab[observed].mean() > 0.99, f
         assert (enc["cat"][observed & in_vocab, j] > 0).all(), f
         assert (enc["cat"][~observed, j] == 0).all(), f
+    assert "UNK" in p.vocab["grew"] and "UNK" in p.vocab["changed"], "UNK answers are real categories"
     assert "BRASIL" not in p.vocab["background_father"], "alias BRASIL->BRAZIL applied"
     assert "biopsed" not in p.categorical + p.continuous

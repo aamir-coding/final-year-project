@@ -48,10 +48,14 @@ def keyed_field_mask(keys: torch.Tensor | Sequence[int], n_fields: int, rate: fl
                      observed: torch.Tensor | None = None, pool: str = "all") -> torch.Tensor:
     """Deterministic inference-time mask, (B, F) bool.
 
-    Each sample gets exactly n_masked_fields(rate, F) masked fields, drawn uniformly
-    from all fields (pool="all") or only from currently observed fields
-    (pool="observed", capped at the number observed). The draw for a sample depends
-    only on (seed, key), never on its batch neighbours.
+    pool="observed" (default in the config): each sample loses n_masked_fields(rate,
+        n_observed) of the fields it actually has, i.e. `rate` of its own information,
+        whatever its natural missingness. This keeps the amount of hidden information
+        comparable across classes (in PAD-UFES-20 benign rows often lack 13 fields).
+    pool="all": exactly n_masked_fields(rate, F) fields drawn from all F fields; draws
+        that land on already-missing fields hide nothing, so the hidden amount then
+        depends on the row's natural missingness (and therefore on its class).
+    The draw for a sample depends only on (seed, key), never on its batch neighbours.
     """
     keys = [int(k) for k in (keys.tolist() if torch.is_tensor(keys) else keys)]
     k = n_masked_fields(rate, n_fields)
@@ -62,8 +66,11 @@ def keyed_field_mask(keys: torch.Tensor | Sequence[int], n_fields: int, rate: fl
     rows = []
     for i, key in enumerate(keys):
         rng = np.random.default_rng([int(seed), key])
-        cand = np.arange(n_fields) if pool == "all" else np.flatnonzero(observed[i].cpu().numpy())
-        rows.append(_choose(rng, cand, k, n_fields))
+        if pool == "all":
+            rows.append(_choose(rng, np.arange(n_fields), k, n_fields))
+        else:
+            cand = np.flatnonzero(observed[i].cpu().numpy())
+            rows.append(_choose(rng, cand, n_masked_fields(rate, len(cand)), n_fields))
     return torch.from_numpy(np.stack(rows)) if rows else torch.zeros(0, n_fields, dtype=torch.bool)
 
 

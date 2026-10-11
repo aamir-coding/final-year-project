@@ -67,7 +67,11 @@ def test_observed_pool_only_masks_present_fields():
     obs = observed_fields(cat, cmiss)
     m = keyed_field_mask(torch.arange(len(cat)), F, 0.5, seed=0, observed=obs, pool="observed")
     assert not (m & ~obs).any()
-    assert (m.sum(1) == torch.clamp(obs.sum(1), max=11)).all()
+    expected = torch.floor(0.5 * obs.sum(1).float() + 0.5).long()
+    assert (m.sum(1) == expected).all(), "observed pool hides `rate` of each sample's observed fields"
+    # the hidden fraction no longer depends on natural missingness
+    frac = m.sum(1).float() / obs.sum(1).float()
+    assert (frac - 0.5).abs().max() <= 0.5 / obs.sum(1).min().item() + 1e-6
 
 
 def test_modality_dropout_modes():

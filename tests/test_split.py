@@ -68,9 +68,29 @@ def test_test_split_requires_explicit_opt_in(synth_cfg):
     df, splits = _split(synth_cfg)
     sdf = split_to_frame(df, splits, synth_cfg)
     assert len(load_split(df, sdf, "train", synth_cfg)) == len(splits["train"])
-    with pytest.raises(PermissionError):
-        load_split(df, sdf, "test", synth_cfg)
+    for bad in (False, "False", 1, "yes", None):
+        with pytest.raises(PermissionError):
+            load_split(df, sdf, "test", synth_cfg, allow_test=bad)
     assert len(load_split(df, sdf, "test", synth_cfg, allow_test=True)) == len(splits["test"])
+
+
+def test_overlap_check_survives_optimisation_and_missing_columns(synth_cfg):
+    from mamg.data import LeakError
+    df, splits = _split(synth_cfg)
+    leaked = dict(splits)
+    leaked["test"] = np.append(splits["test"], splits["train"][0])
+    with pytest.raises(LeakError):  # raised explicitly, so `python -O` cannot skip it
+        assert_no_overlap(df, leaked)
+    with pytest.raises(KeyError):
+        assert_no_overlap(df.drop(columns=["lesion_id"]), splits)
+
+
+def test_load_split_returns_positions_on_any_index(synth_cfg):
+    df, splits = _split(synth_cfg)
+    sdf = split_to_frame(df, splits, synth_cfg)
+    shuffled = df.sample(frac=1.0, random_state=0)  # non-RangeIndex
+    idx = load_split(shuffled, sdf, "train", synth_cfg)
+    assert set(shuffled.iloc[idx]["img_id"]) == set(sdf.loc[sdf.split == "train", "img_id"])
 
 
 def test_load_split_detects_tampered_file(synth_cfg):

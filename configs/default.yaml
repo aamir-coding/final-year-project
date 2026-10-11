@@ -37,8 +37,8 @@ data:
   continuous_fields: [age, diameter_1, diameter_2]
   # Never used as features. biopsed is a label proxy (all BCC/MEL/SCC are biopsy-proven).
   excluded_fields: [biopsed]
-  # Literal strings in the raw CSV that mean "not known"; treated as missing (index 0).
-  missing_tokens: ["", "UNK", "unk", "NaN", "nan"]
+  # Raw strings that mean "not recorded"; encoded as missing (index 0).
+  missing_tokens: ["", "NaN", "NA", "None"]   # case-insensitive; literal "UNK" is a real answer (patient did not know), not missing
   # Spelling variants merged before encoding (raw value -> canonical value).
   value_aliases: {BRASIL: BRAZIL}
   # Rows used for training. In PAD-UFES-20 the 804 rows with the questionnaire block
@@ -106,7 +106,7 @@ train:
 eval:
   missingness_rates: [0.0, 0.1, 0.3, 0.5]
   mask_seeds: [0, 1, 2, 3, 4]
-  mask_pool: all               # all | observed - pool of fields the masker samples from
+  mask_pool: observed          # observed: hide `rate` of each image's observed fields | all: of all 21 fields
   subsets: [all, complete_metadata]   # evaluation reported separately on each subset
   bootstrap_resamples: 1000
   ci_level: 0.95
