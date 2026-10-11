@@ -191,12 +191,10 @@ def train(cfg: dict, model_name: str, seed: int, resume: bool = False) -> dict:
                         "val_gate_mean": float(np.mean(val["gate"])), "val_gate_std": float(np.std(val["gate"])),
                         "val_gate_mean_all_masked": float(np.mean(vall["gate"])),
                         "val_macro_f1": vm["macro_f1"]}
-                _append_csv(res_dir / "gate_log.csv", grow)
                 if grow["val_gate_std"] < 1e-3 or not 0.02 < grow["val_gate_mean"] < 0.98:
                     print(f"WARNING epoch {epoch}: possible gate collapse "
                           f"(mean {grow['val_gate_mean']:.3f}, std {grow['val_gate_std']:.4f})")
                 row.update({k: grow[k] for k in ("val_gate_mean", "val_gate_std", "val_gate_mean_all_masked")})
-            _append_csv(history_csv, row)
 
         state["wall_clock_s"] += t.elapsed
         state["epoch"] = epoch
@@ -215,6 +213,10 @@ def train(cfg: dict, model_name: str, seed: int, resume: bool = False) -> dict:
         torch.save(ck, last_ckpt)
         if improved:
             torch.save(ck, best_ckpt)
+        # logs are written only after the checkpoint exists, so a crash cannot duplicate an epoch on --resume
+        _append_csv(history_csv, row)
+        if model_name == "gated":
+            _append_csv(res_dir / "gate_log.csv", grow)
         print(f"epoch {epoch}: loss {row['train_loss']:.4f} val macro-F1 {vm['macro_f1']:.4f} "
               f"mal-sens {vm['malignant_sensitivity']:.3f} ({t.elapsed:.0f}s){' *' if improved else ''}")
         if stop:
