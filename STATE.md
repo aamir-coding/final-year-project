@@ -10,6 +10,8 @@
 - REAL DATA: OBTAINED. metadata.csv + imgs_part_1..3.zip downloaded from Mendeley, SHA-256 verified, 2,298 PNGs extracted to data/raw/images (gitignored). Counts match: 2,298 rows, 1,373 patients, 1,641 lesion ids.
 - Missingness measured: results/missingness_profile.csv, results/missingness_by_class.csv (questionnaire block missing in 804 rows = 35%, ALL benign -> see DECISIONS.md)
 - Split written: splits/split_seed42.csv (1589/364/345)
+- Tests: 72 passed (`.venv/Scripts/python -m pytest -q`, ~1 min CPU)
+- No git remote configured, so nothing was pushed
 - venv: torch 2.14.1+cpu, torchvision 0.29.1, timm 1.0.30, pandas 2.3.3, sklearn 1.7.2, grad-cam 1.5.7, fvcore, thop
 
 ## Work packages
@@ -22,13 +24,13 @@
 - [x] WP7 XAI (xai_eval.py: Grad-CAM++, deletion/insertion AUC + random baseline, efficiency table; tests/test_xai.py)
 - [x] WP8 Kaggle runner (kaggle/kernel-metadata.json, runner.ipynb, README.md, configs/kaggle.yaml)
 - [x] WP9 Team learning docs (docs/WALKTHROUGH.md, docs/CLAIMS_GUARDRAIL.md)
-- [ ] WP10 Hardening + leak hunt + MORNING_REPORT.md
+- [x] WP10 Hardening + independent leak hunt (no leak found; 6 weaknesses fixed) + MORNING_REPORT.md
 
 ## In progress
-WP10: independent leak hunt (Opus subagent) running; fix findings, then MORNING_REPORT.md.
+Nothing. Overnight run complete.
 
 ## Next action
-Apply leak-hunt fixes, run pytest -q, write MORNING_REPORT.md, append ALL_DONE.
+Team: read MORNING_REPORT.md (three decisions at the top), then follow 'Commands for tomorrow'.
 
 ## Blockers
 None.
@@ -36,3 +38,5 @@ None.
 ## Resume protocol
 Read STATE.md, CLAUDE.md, DECISIONS.md; `git log --oneline -20`; `git status`;
 `.venv/Scripts/python -m pytest -q`; continue from the first unchecked WP.
+
+ALL_DONE
