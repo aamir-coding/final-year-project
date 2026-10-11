@@ -52,7 +52,7 @@ So "the missingness-aware model does better" can be true for the wrong reason. T
 
 **Things to be careful about when we decide:**
 
-- The complete subset has 1,445 images and a very different class mix: about 71% malignant (about BCC 822, SCC 184, MEL 51) and few benign (about ACK 282, NEV 62, SEK 44, over all splits; computed from the `frac_complete_metadata` column). Per-class results for NEV, SEK and MEL will be noisy.
+- The complete subset has 1,494 images and a very different class mix: 72.9% malignant (BCC 845, SCC 192, MEL 52 — every malignant image) and few benign (ACK 283, NEV 75, SEK 47), over all splits. Per-class results for NEV, SEK and MEL will be noisy.
 - **Note:** `data.train_subset` filters train and val only while training (model selection). Evaluation and XAI always load the full split and report the `all` and `complete_metadata` subsets separately.
 - Whichever setting we pick, report both subsets, say which is primary, and describe the confound in the same paragraph as the headline result.
 
@@ -150,21 +150,21 @@ The largest module. Four jobs: read and clean the metadata, split it without lea
 
 **Splitting**
 - `patient_level_split(...)`: cuts the groups into 20 folds with sklearn's `StratifiedGroupKFold` (keeps groups whole and class mix close to global), then gives whole folds to train/val/test as 14/3/3, which is 70/15/15 by image count. It calls `assert_no_overlap` before returning.
-- `assert_no_overlap(...)`: asserts no patient, lesion or image id is in two splits, and no row is assigned twice. The message starts with `LEAK`.
+- `assert_no_overlap(...)`: checks that no patient, lesion or image id is in two splits and no row is assigned twice. It raises `LeakError` explicitly (not a bare `assert`, so `python -O` cannot switch it off), and a missing id column is an error. The message starts with `LEAK`.
 - `split_to_frame`, `split_summary`, `split_path`: write and describe the split file `splits/split_seed42.csv` (committed, so everyone and every machine uses the same split).
 - `load_split(..., allow_test=False)`: reads rows of one split **from the file**, re-runs `assert_no_overlap` every time, checks the file covers every metadata row, and raises `PermissionError` for the test split unless `allow_test=True`.
 
 **Why.** The split algorithm went through three versions (DECISIONS: "Split algorithm (revised)"); simple greedy versions put only 4 MEL images in val or skewed the class mix. Seed-42 result: 1589 / 364 / 345 images, MEL 39 / 6 / 7. Re-checking overlap on every load means a hand-edited split file cannot silently leak.
 
 **Encoding tabular data: `TabularPreprocessor`**
-- Categorical fields: observed values become indices 1..K (sorted, so deterministic). Missing, "UNK", or a value never seen in train becomes **0**.
+- Categorical fields: values are canonicalised ('2' = '2.0', 'True' = 'TRUE'), then observed values become indices 1..K (sorted, so deterministic). The patient's answer "UNK" (did not know) is one of those real categories. A value that was not recorded (empty / NaN / NA / None) or never seen in train becomes **0**.
 - Continuous fields (age, diameter_1, diameter_2): z-score with train mean/std. Missing becomes 0 (the mean, after scaling) **plus** a separate missing flag.
 - `fit()` uses train rows only. It also stores the train mode of each categorical field (for the imputation baseline).
 - `state_dict()` / `from_state_dict()`: saved inside checkpoints so evaluation uses the same encoding.
 
 **Why**
 - *Index 0 is reserved* (invariant 2): if "missing" shared an index with "False", the model could not tell "no smoking" from "did not answer".
-- *"UNK" counts as missing, not as a category* (DECISIONS: "Literal UNK treated as missing", marked NEEDS HUMAN REVIEW).
+- *"UNK" is a real category, not missing* (DECISIONS: WP10 leak-hunt entry, NEEDS HUMAN REVIEW). UNK means the patient was asked and did not know, and it leans malignant (P(grew=UNK | SCC) = 0.39 vs 0.008 for ACK), whereas a not-recorded block is always benign. Putting both at index 0 would give one index two opposite meanings. Continuous values that are non-finite or overflow float32 are treated as missing.
 - *Fit on train only* (invariant 4): means, vocabularies and modes computed on val/test would leak information about them into training.
 - *`biopsed` is not a feature* (DECISIONS: "biopsed excluded"): every BCC/MEL/SCC is biopsy-proven, so it is almost the label, and a biopsy result is not known at triage.
 - *`fitspatrick` is categorical* (only 6 levels).
@@ -197,7 +197,7 @@ The largest module. Four jobs: read and clean the metadata, split it without lea
 **Why**
 - *One code path* (CLAUDE.md conventions): if training dropout and the evaluation sweep were written separately, "masked" could mean two different things.
 - *Keyed masks*: the same image gets the same mask no matter how the batch is built; results do not change when the batch size changes.
-- *Pool `all`* (DECISIONS: "Inference masking definition"): fields are drawn from all 21, so an already-missing field can be drawn. Therefore evaluation also records `effective_missing_ratio`. The alternative `mask_pool: observed` exists and is tested (NEEDS HUMAN REVIEW).
+- *Pool `observed` (default)* (DECISIONS: WP10 leak-hunt entry, NEEDS HUMAN REVIEW): at rate r each image loses `floor(r * n_observed + 0.5)` of the fields it actually has, so every image loses the same *fraction of its own information*. The older `mask_pool: all` (exactly `floor(r*21 + 0.5)` fields from all 21) is still available, but the independent review showed it hides about twice as many real fields on malignant rows as on benign rows, because benign rows are often already missing 13 fields. Evaluation also records `effective_missing_ratio`.
 - *Modality dropout in training* teaches the model to cope with missing metadata; it is applied identically to late, impute and gated so the comparison is fair (DECISIONS: "Modality dropout is applied to all three metadata models").
 
 ### `models.py` (owner: Chirag)
@@ -312,7 +312,7 @@ Run with `pytest -q`. They use a small **synthetic** fixture (random tiny images
 | `conftest.py` | Shared fixtures: base config, synthetic data folder, synthetic config (outputs forced into a temp folder) | 9 |
 | `fixtures/make_synthetic.py` | Builds the SYNTHETIC look-alike, with a 35% benign-only missing block, UNK values and shared lesion ids; writes `SYNTHETIC_DATA_MARKER` | 9 |
 | `test_split.py` | Zero overlap on patient, lesion, image and group ids; ratios within tolerance; every class present in every split; determinism; shared lesion ids stay together; `assert_no_overlap` really catches a deliberate leak; test split needs `allow_test`; a tampered split file is detected on load; real-data split has 2,298 rows, 1,373 patients, 1,641 lesions | 1, 5 |
-| `test_preprocessing.py` | Missing/UNK map to 0 and never equal "False"; vocabularies and scaler fit on train only; unseen category to 0; state round-trips; class weights and oversampling counts; on real data no observed value maps to 0 and `biopsed` is not a feature | 2, 4 |
+| `test_preprocessing.py` | Not-recorded values map to 0 and never equal "False"; UNK is its own category; spelling canonicalisation; non-finite numbers become missing; vocabularies and scaler fit on train only; unseen category to 0; state round-trips; class weights and oversampling counts; on real data no observed value maps to 0 and `biopsed` is not a feature | 2, 4 |
 | `test_masking.py` | Exact number of masked fields per rate; same seed same mask, independent of batch order and size; masks spread evenly over fields; masked values look like natural missing; inputs not modified; `observed` pool only masks present fields; modality dropout proportions | single masking path |
 | `test_masking_behaviour.py` | With all metadata masked the gated model still gives finite logits and a gate in (0,1); the gate reacts to the missing ratio; the imputation baseline cannot tell missing from mode; late fusion can tell missing from "no" | model design |
 | `test_gate_zero.py` | With `g = 0` the gated logits equal a real `ImageOnly` model's logits (weights copied, 1e-6); with `g = 0` changing all metadata changes nothing; with `g = 1` metadata does matter (guards against a vacuous pass) | 3 |
@@ -395,7 +395,7 @@ Rule from the playbook: whoever's module Claude wrote that day explains it to th
 - [ ] What is the union-find step for, and what is odd about `lesion_id` in this dataset (250 shared ids)?
 - [ ] How does `StratifiedGroupKFold` give a 70/15/15 split, and why 20 folds? What are the final counts, and why does MEL have only 6 and 7 images in val and test?
 - [ ] Where is the leakage assertion called (three places) and what does the test with a planted leak show?
-- [ ] Why is "missing" index 0 and not a normal category? What would break if "UNK" were a category?
+- [ ] Why is "missing" index 0 and not a normal category? Why is "UNK" a category of its own and not index 0 (use the grew/changed numbers)?
 - [ ] Why is every statistic (vocabulary, mean, std, mode, class weights) fit on train only?
 - [ ] Why is `biopsed` not a feature?
 - [ ] Explain the 804-row finding with the numbers from `missingness_by_class.csv`, why it matters for a missingness-aware model, and what `complete_metadata` and `data.train_subset` do.

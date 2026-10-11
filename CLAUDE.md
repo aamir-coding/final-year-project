@@ -15,7 +15,8 @@ Team: Aamir Mohammed Khan (data/tabular), Chirag G K (model/training), Giridhar 
    split asserts zero patient AND zero lesion overlap (`assert_no_overlap`), at split
    time, at load time, and in tests. A random image-level split invalidates every result.
 2. A missing categorical value maps to reserved index 0, never to the same index as a
-   genuine "no"/"False"/"0". Literal "UNK" is treated as missing, not as a category.
+   genuine "no"/"False"/"0" or any real answer. The literal answer "UNK" (patient did
+   not know) is a real category of its own; index 0 means "not recorded" only.
 3. fused = image_global + gate * attention_out. gate=0 must reproduce the image-only
    logits exactly. tests/test_gate_zero.py verifies this for the implementation (tolerance 1e-6); keep it passing.
 4. Preprocessing statistics (means, stds, vocabularies, modes, class weights) are fit
