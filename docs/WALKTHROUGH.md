@@ -322,7 +322,7 @@ Run with `pytest -q`. They use a small **synthetic** fixture (random tiny images
 | `test_xai.py` | Deletion curve decreases and insertion curve increases on a toy model; a correct saliency beats random order and a wrong one loses to it; AUC maths; Grad-CAM++ works on the real gated model; efficiency table filled; end-to-end XAI sweep on synthetic data | faithfulness maths |
 | `test_invariants.py` | Repository-level guards: `train.py` and `xai_eval.py` never ask for the test split; synthetic outputs are routed away from `results/`; committed CSVs under `results/` contain no synthetic rows | 5, 8, 9 |
 
-**Difference.** `CLAUDE.md` says the gate-zero test "proves" invariant 3. Safer wording (see `docs/CLAIMS_GUARDRAIL.md`): the test verifies that the *implementation* has the residual property. It says nothing about whether the trained gate learns something useful.
+**Wording.** The gate-zero test verifies that the *implementation* has the residual property (see `docs/CLAIMS_GUARDRAIL.md`). It says nothing about whether the trained gate learns something useful; that evidence comes from `results/gate_log.csv` and the missingness sweep.
 
 ---
 

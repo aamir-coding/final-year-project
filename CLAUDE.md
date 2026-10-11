@@ -17,7 +17,7 @@ Team: Aamir Mohammed Khan (data/tabular), Chirag G K (model/training), Giridhar 
 2. A missing categorical value maps to reserved index 0, never to the same index as a
    genuine "no"/"False"/"0". Literal "UNK" is treated as missing, not as a category.
 3. fused = image_global + gate * attention_out. gate=0 must reproduce the image-only
-   logits exactly. tests/test_gate_zero.py proves it (tolerance 1e-6); keep it passing.
+   logits exactly. tests/test_gate_zero.py verifies this for the implementation (tolerance 1e-6); keep it passing.
 4. Preprocessing statistics (means, stds, vocabularies, modes, class weights) are fit
    on TRAIN only. Unseen categories at val/test map to 0 (missing).
 5. The test split is touched only by `python -m mamg.evaluate --final-test`, which
