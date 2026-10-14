@@ -48,5 +48,22 @@ Team: Aamir Mohammed Khan (data/tabular), Chirag G K (model/training), Giridhar 
   dropout and the inference-time missingness sweep.
 - Record every non-obvious choice in DECISIONS.md with a date.
 
+## Team workflow (two laptops, one GitHub repo)
+- Repo: https://github.com/aamir-coding/final-year-project (branch `main`). Teammates work
+  on separate laptops with separate Claude Code sessions; GitHub is the only sync channel.
+- Start of every session: `git pull`, then read STATE.md. End of every unit of work:
+  commit, update STATE.md, `git push`. Pull again right before pushing.
+- Commit messages: plain, human-style summaries. NEVER add "Co-Authored-By: Claude" or
+  any Claude/Anthropic attribution line to commits or PR descriptions.
+- Split work by module ownership (see MORNING_REPORT.md) so two people do not edit the
+  same file on the same day. Large or cross-module changes go on a short-lived branch.
+- Append-only CSVs (results/runs.csv, results/gate_log.csv, results/final_test_lock.csv):
+  on a merge conflict keep BOTH sides' rows, never drop one.
+- Before anyone runs `--final-test`: pull, check results/final_test_lock.csv, run it,
+  then commit and push the lock file immediately so the other laptop cannot repeat it.
+- Never commit data/, checkpoints/, *.pt, tmp/, kaggle_output/, kaggle.json or tokens.
+- data/ is gitignored: each laptop needs its own copy (see "Setting up a new laptop" in
+  STATE.md). splits/split_seed42.csv is committed and must never be regenerated.
+
 ## Current state
 See STATE.md (single source of truth for progress) and MORNING_REPORT.md.
