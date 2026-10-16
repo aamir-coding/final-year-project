@@ -83,3 +83,17 @@ def test_other_models_train(synth_cfg, model_name):
     assert (out["run_dir"] / "best.pt").exists()
     ck = torch.load(out["run_dir"] / "best.pt", map_location="cpu", weights_only=False)
     assert ck["data_kind"] == "SYNTHETIC" and ck["preprocessor"]["n_fit_rows"] > 0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_rng_state_restores_after_cuda_map_location():
+    """A checkpoint loaded with map_location=cuda puts the RNG ByteTensors on the GPU;
+    restoring them must still work (this broke --resume on GPU)."""
+    from mamg.train import _rng_state, _set_rng_state
+    s = _rng_state()
+    expected = s["torch"].clone()
+    s["torch"] = s["torch"].cuda()
+    s["cuda"] = [t.cuda() for t in s["cuda"]]
+    torch.rand(10)  # advance the generator so a no-op restore would fail the check
+    _set_rng_state(s)
+    assert torch.equal(torch.get_rng_state(), expected)

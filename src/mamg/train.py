@@ -74,11 +74,12 @@ def _rng_state() -> dict:
 
 
 def _set_rng_state(s: dict) -> None:
-    torch.set_rng_state(s["torch"])
+    # torch.load(map_location=cuda) moves these ByteTensors to the GPU; the setters need CPU tensors.
+    torch.set_rng_state(s["torch"].cpu())
     np.random.set_state(s["numpy"])
     random.setstate(s["random"])
     if s.get("cuda") is not None and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(s["cuda"])
+        torch.cuda.set_rng_state_all([t.cpu() for t in s["cuda"]])
 
 
 def train(cfg: dict, model_name: str, seed: int, resume: bool = False) -> dict:
