@@ -22,3 +22,6 @@ build/
 dist/
 .ipynb_checkpoints/
 kaggle_output/
+
+# machine-specific config (paths outside the repo)
+configs/local.yaml

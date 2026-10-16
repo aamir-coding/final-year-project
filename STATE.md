@@ -1,4 +1,28 @@
-# STATE.md — single source of truth for the overnight run
+# STATE.md — single source of truth for progress
+
+## Progress: M1 in progress, ~40% (updated 2026-10-16, Chirag)
+
+| Milestone | % | Done when |
+|---|---|---|
+| M0 overnight build | 35 | pipeline, tests, real data, split (done 2026-10-12) |
+| **M1 decisions + GPU smoke run** | **45** | review items settled (done), local/Kaggle GPU smoke run succeeds (pending) |
+| M2 first real runs | 55 | gated + image-only trained, gate_log checked for collapse, results plausible (~0.70 bal. acc. per MetaBlock-SE) |
+| M3 full grid | 70 | 4 models x 3 seeds, val sweeps on both subsets, paired bootstrap (gated vs late, gated vs impute), complete-only ablation |
+| M4 XAI + figures | 80 | deletion/insertion sweep, efficiency table, figures from committed CSVs |
+| M5 final test | 88 | `--final-test` once per chosen checkpoint, lock pushed, final tables |
+| M6 write-up + demo | 100 | report, paper draft, demo app, viva notes |
+
+Done this turn: all NEEDS HUMAN REVIEW items decided (DECISIONS.md, 2026-10-16); second laptop set up (RTX 4050, venv outside OneDrive, `configs/local.yaml`), real data in place, 72/72 tests pass.
+
+**Next action:** GPU smoke run on Chirag's laptop. It is blocked by the Windows page file (see Blockers); after the fix run
+`python -m mamg.train --config configs/local.yaml --model gated --seed 1 --set train.epochs=2 --set paths.results_dir=tmp/gpu_smoke/results`
+(output kept out of results/), then start M2.
+
+## Environment (Chirag's laptop, 2026-10-16)
+- Windows 11 Home 10.0.26200, 16 GB RAM, NVIDIA RTX 4050 Laptop GPU 6 GB (driver 581.29)
+- venv: `C:\Users\Chirag G K\mamg-local\.venv` (Python 3.13.3, torch 2.14.1+cu132, torchvision 0.29.1+cu132; rest from requirements.txt)
+- Data: metadata.csv in repo `data/raw/` (gitignored); 256-px image cache and checkpoints in `C:\Users\Chirag G K\mamg-local\` (outside OneDrive), wired by gitignored `configs/local.yaml`
+- Tests: 72 passed with real data
 
 ## Environment (Aamir's laptop, detected 2026-10-12 00:28 IST)
 - OS: Windows 11 Home 10.0.26300 (Git Bash / MINGW64 + PowerShell)
@@ -26,14 +50,8 @@
 - [x] WP9 Team learning docs (docs/WALKTHROUGH.md, docs/CLAIMS_GUARDRAIL.md)
 - [x] WP10 Hardening + independent leak hunt (no leak found; 6 weaknesses fixed) + MORNING_REPORT.md
 
-## In progress
-Nothing. Overnight run complete.
-
-## Next action
-Team: read MORNING_REPORT.md (three decisions at the top), then follow 'Commands for tomorrow'.
-
 ## Blockers
-None.
+- Chirag's laptop: page file fixed at 7.4 GB, so torch+CUDA processes fail (WinError 1455 "paging file too small" in DataLoader workers; CUDA OOM with VRAM free). Fix: set the page file to system-managed (or >= 16 GB), reboot. Machine setting, not a code change.
 
 ## Setting up a new laptop (teammates)
 1. `git clone` / `git pull` the repo; create a venv: `python -m venv .venv`
@@ -47,6 +65,9 @@ None.
    and "split file exists, not overwritten"). Alternatively copy Aamir's data/raw/metadata.csv and
    data/processed/ (223 MB) via a drive. Never pass --force-split.
 5. Re-run `python -m pytest -q` (real-data tests now run too).
+6. If the repo is inside OneDrive: keep the venv, images and checkpoints outside it. Copy
+   `configs/local.example.yaml` to `configs/local.yaml` (gitignored), set your paths, and pass
+   `--config configs/local.yaml`. Windows + CUDA needs a large page file (system-managed).
 
 ## Resume protocol
 `git pull`; read STATE.md, CLAUDE.md, DECISIONS.md; `git log --oneline -20`; `git status`;
@@ -55,10 +76,10 @@ None.
 ALL_DONE (overnight build, 2026-10-12). Phase 2 (real training on Kaggle/HPC, sweeps, XAI, paper) is ongoing: track it in the checklist below.
 
 ## Phase 2 checklist (update as you go)
-- [ ] Team decision on the missingness/benign confound protocol (MORNING_REPORT item 1) recorded in DECISIONS.md
-- [ ] Review all NEEDS HUMAN REVIEW items in DECISIONS.md
-- [ ] Private Kaggle dataset uploaded (metadata.csv + resized images) and kaggle/ placeholders filled
-- [ ] First gated + image-only Kaggle runs; gate_log.csv checked for collapse
+- [x] Team decision on the missingness/benign confound protocol (MORNING_REPORT item 1) recorded in DECISIONS.md
+- [x] Review all NEEDS HUMAN REVIEW items in DECISIONS.md
+- [ ] GPU smoke run (local RTX 4050 first; Kaggle dataset upload + kaggle/ placeholders only if local GPU is not enough)
+- [ ] First gated + image-only runs; gate_log.csv checked for collapse
 - [ ] 4 models x 3 seeds trained; results CSVs committed
 - [ ] Validation missingness sweeps (both subsets) + paired comparisons
 - [ ] XAI sweep + efficiency table

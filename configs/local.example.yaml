@@ -1,0 +1,15 @@
+_base_: default.yaml            # inherit every setting; only machine-specific paths/runtime change
+# Copy to configs/local.yaml (gitignored) and edit the paths for your laptop, then run e.g.
+#   python -m mamg.train --config configs/local.yaml --model gated --seed 1
+# `paths` and `runtime` are excluded from the config hash, so runs on any machine share
+# experiment ids. metadata_csv stays default (data/raw/metadata.csv in the repo, where the
+# tests look for it). Keep images, checkpoints and the venv outside OneDrive/Dropbox folders.
+
+paths:
+  image_dir: C:/path/outside/onedrive/data/processed     # the 256-px resized cache
+  image_cache_dir: ""                                    # image_dir already is the cache
+  checkpoints_dir: C:/path/outside/onedrive/checkpoints
+
+runtime:
+  device: cuda
+  num_workers: 2      # on Windows each worker reloads the CUDA DLLs; lower it if you hit WinError 1455
