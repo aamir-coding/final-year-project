@@ -23,7 +23,7 @@
    - Run seeds 2–3 of the complete-metadata ablation (about 30 GPU-minutes).
    - Try a gate without the missingness-ratio input. This is a model change, so it needs a decision first.
 3. **M5.** Which checkpoints get the one-shot `--final-test`? For example all 12 main-grid `best.pt` plus the 2 ablation runs. Pull and check `results/final_test_lock.csv` first, then push the lock immediately (CLAUDE.md).
-4. **Checkpoints.** They are only on Chirag's laptop (`C:\Users\Chirag G K\mamg-local\checkpoints\`, 56 MB per `best.pt`, never in git). M4 needs at least gated and late for seeds 1–3, six files (~340 MB). Ask Chirag to share them over a drive, or run M4 on his laptop. Retraining elsewhere gives close but not bit-identical weights.
+4. **Checkpoints.** They are only on Chirag's laptop (`C:\Users\Chirag G K\mamg-local\checkpoints\`, 56 MB per `best.pt`, never in git). M4 needs at least gated and late for seeds 1–3, six files (~340 MB). Chirag is sharing all 14 `best.pt` files as `mamg_checkpoints_2026-10-17.zip` (677 MB) over Google Drive; verify them against `results/checkpoints_sha256.txt` before use (the final-test lock is keyed by checkpoint SHA-256). Alternatively, run M4 on his laptop. Retraining elsewhere gives close but not bit-identical weights.
 
 **Exact next step (M4, ~80%)**
 1. `git pull`, read this file and DECISIONS.md 2026-10-17. Get the checkpoints (open question 4).
