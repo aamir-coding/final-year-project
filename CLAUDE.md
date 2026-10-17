@@ -39,6 +39,7 @@ Team: Aamir Mohammed Khan (data/tabular), Chirag G K (model/training), Giridhar 
 - python -m mamg.train --config configs/default.yaml --model {image,late,impute,gated} --seed 1 [--resume]
 - python -m mamg.evaluate --config configs/default.yaml --ckpt <path>                # val sweep (dev)
 - python -m mamg.evaluate --config configs/default.yaml --ckpt <path> --final-test   # ONCE, at the end
+- python -m mamg.compare --config configs/default.yaml --a <run_name> --b <run_name>   # paired bootstrap A - B on the same images
 - python -m mamg.xai_eval --config configs/default.yaml --ckpt <path> [--efficiency]
 
 ## Conventions
