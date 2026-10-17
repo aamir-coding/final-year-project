@@ -51,7 +51,7 @@ Done this turn: all NEEDS HUMAN REVIEW items decided (DECISIONS.md, 2026-10-16);
 - [x] WP10 Hardening + independent leak hunt (no leak found; 6 weaknesses fixed) + MORNING_REPORT.md
 
 ## Blockers
-None. (Resolved: the page file was fixed at 7.4 GB, so torch+CUDA processes failed with WinError 1455 / CUDA OOM; set to system-managed and rebooted.)
+- Chirag's laptop GPU was lost at ~07:04 on 2026-10-17 (nvidia-smi: "GPU is lost. Reboot the system"). Needs a reboot; then the training queue resumes from `last.pt` (late s2 epoch 13, image s2 epoch 12, the rest not started). (Earlier, resolved: page file too small -> set to system-managed.)
 
 ## Setting up a new laptop (teammates)
 1. `git clone` / `git pull` the repo; create a venv: `python -m venv .venv`
