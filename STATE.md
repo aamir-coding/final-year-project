@@ -1,5 +1,45 @@
 # STATE.md — single source of truth for progress
 
+## Relay handover — 2026-10-17, Chirag G K → next driver
+
+**Milestone reached: M3 done, ~70%** (start of this turn: ~35%, end of M0). Last commit before this handover: `d3e7749`. Nothing is running; the working tree is clean.
+
+**What changed this turn (16–17 Oct)**
+- **M1:** every NEEDS HUMAN REVIEW item decided. Main grid trains on all rows; `complete_metadata` is the primary subset for the missingness sweep, plus a complete-only ablation. Items 2–9 accepted as implemented. See DECISIONS.md 2026-10-16.
+- **M1:** second laptop set up. `configs/local.example.yaml` documents how to keep paths outside OneDrive without changing the config hash. GPU smoke run passed.
+- **Bug fix:** `--resume` crashed on CUDA, because the saved RNG state was loaded onto the GPU. Fixed in `train.py`, with a CUDA-only regression test.
+- **New command:** `python -m mamg.compare --a <run> --b <run>`. It reports paired, patient-clustered bootstrap differences per subset and masking rate, as level differences (A − B) and degradation (`*_drop_reduction`, positive = A degrades less). Tests in `tests/test_compare.py`. 78 tests pass.
+- **M2:** gate checked. No collapse, but the gate stays near 0.5 and reacts weakly to masking. Results plausible: balanced accuracy 0.62–0.73, in line with MetaBlock-SE's ~0.70. No leak check was needed.
+- **M3 training:** 4 models × seeds 1–3 (config hash `1bd64f00`), plus gated and late trained on complete-metadata rows only (seed 1, hash `feff02f0`). 14 runs in total in `results/runs.csv`, `results/history/` and `results/gate_log.csv`.
+- **M3 evaluation:** validation sweeps for all 14 runs (`results/eval/`) and 9 paired comparisons (`results/compare/`).
+- **Results and the claim wording they support:** DECISIONS.md, "2026-10-17 — M3 results". Short version:
+  - Gated is about 4 macro-F1 points below late fusion on complete inputs (0.683 vs 0.727).
+  - It degrades less under masking in 2 of 3 seeds, with the paired CI above 0 at 30–50% masking. Seed 1 shows no difference.
+  - On complete rows the gate *rises* as answers are hidden (the missingness shortcut). The complete-only ablation reverses this, but it is 1 seed only.
+
+**Open questions (need the team / guide)**
+1. **Paper framing.** Agree the wording in DECISIONS.md "M3 results": "degrades less in 2 of 3 seeds, at ~4 points cost on complete inputs". Not "better than late fusion".
+2. **Shortcut follow-up.** Options, either or both:
+   - Run seeds 2–3 of the complete-metadata ablation (about 30 GPU-minutes).
+   - Try a gate without the missingness-ratio input. This is a model change, so it needs a decision first.
+3. **M5.** Which checkpoints get the one-shot `--final-test`? For example all 12 main-grid `best.pt` plus the 2 ablation runs. Pull and check `results/final_test_lock.csv` first, then push the lock immediately (CLAUDE.md).
+4. **Checkpoints.** They are only on Chirag's laptop (`C:\Users\Chirag G K\mamg-local\checkpoints\`, 56 MB per `best.pt`, never in git). M4 needs at least gated and late for seeds 1–3, six files (~340 MB). Ask Chirag to share them over a drive, or run M4 on his laptop. Retraining elsewhere gives close but not bit-identical weights.
+
+**Exact next step (M4, ~80%)**
+1. `git pull`, read this file and DECISIONS.md 2026-10-17. Get the checkpoints (open question 4).
+2. Run `python -m mamg.xai_eval --config <your config> --ckpt "<checkpoints_dir>/gated_s1_1bd64f00/best.pt"`. Repeat for `late_s1_1bd64f00`, then seeds 2–3 if time allows. This is the validation split only; budget 1–2 GPU hours.
+3. Run `python -m mamg.xai_eval --config <your config> --efficiency` for the parameters / MACs / CPU latency table.
+4. Build figures in `figures/` only from committed CSVs:
+   - macro-F1 vs masking per subset, mean ± seed spread (`results/eval/*_val_summary.csv`);
+   - a drop-reduction forest plot (`results/compare/*_val.csv`, metric `macro_f1_drop_reduction`);
+   - gate mean vs masking, main grid vs ablation (`metric == gate_mean` in the summaries).
+5. Commit, update this file (milestone, %, next action), pull, push.
+
+**Practical notes for anyone training on a laptop GPU**
+- Windows needs a system-managed page file. A fixed small one gives WinError 1455 or CUDA OOM.
+- Use `runtime.num_workers: 0` on Windows.
+- Keep at most two GPU processes. With three, the RTX 4050 once dropped off the bus ("GPU is lost"); the processes hung without crashing until a reboot. All runs are resumable with `--resume`.
+
 ## Progress: M3 done, ~70% (updated 2026-10-17, Chirag)
 
 | Milestone | % | Done when |
