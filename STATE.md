@@ -1,6 +1,6 @@
 # STATE.md — single source of truth for progress
 
-## Progress: M1 done, ~45%; M2 running (updated 2026-10-16, Chirag)
+## Progress: M2 nearly done, ~50%; M3 training (updated 2026-10-17, Chirag)
 
 | Milestone | % | Done when |
 |---|---|---|
@@ -14,9 +14,9 @@
 
 Done this turn: all NEEDS HUMAN REVIEW items decided (DECISIONS.md, 2026-10-16); second laptop set up (RTX 4050, venv outside OneDrive, `configs/local.yaml`), real data in place, 72/72 tests pass; page file fixed; GPU smoke run (gated, 20 steps + val, output in tmp/) succeeded on CUDA with AMP.
 
-**Next action (M2):** full gated and image-only runs, seed 1, on the RTX 4050:
-`python -m mamg.train --config configs/local.yaml --model gated --seed 1` (and `--model image`), then check
-`results/gate_log.csv` for collapse and the val metrics for plausibility.
+2026-10-17: finished runs: gated s1/s2, late s1, impute s1 (`results/runs.csv`); gate checked, no collapse, results plausible (DECISIONS.md 2026-10-17). Training: image s1 (last M2 run), then late/image/impute s2, all models s3, and the complete-metadata ablation (gated, late).
+
+**Next action:** when image s1 finishes, M2 is done; run `python -m mamg.evaluate --config configs/local.yaml --ckpt "<checkpoints_dir>/<run>/best.pt"` on each finished run (validation sweep), then paired comparisons once all 3 seeds exist.
 
 ## Environment (Chirag's laptop, 2026-10-16)
 - Windows 11 Home 10.0.26200, 16 GB RAM, NVIDIA RTX 4050 Laptop GPU 6 GB (driver 581.29)
@@ -79,7 +79,7 @@ ALL_DONE (overnight build, 2026-10-12). Phase 2 (real training on Kaggle/HPC, sw
 - [x] Team decision on the missingness/benign confound protocol (MORNING_REPORT item 1) recorded in DECISIONS.md
 - [x] Review all NEEDS HUMAN REVIEW items in DECISIONS.md
 - [x] GPU smoke run (local RTX 4050; Kaggle dataset upload + kaggle/ placeholders only if local GPU is not enough)
-- [ ] First gated + image-only runs; gate_log.csv checked for collapse
+- [ ] First gated + image-only runs; gate_log.csv checked for collapse (gated done and checked; image s1 training)
 - [ ] 4 models x 3 seeds trained; results CSVs committed
 - [ ] Validation missingness sweeps (both subsets) + paired comparisons
 - [ ] XAI sweep + efficiency table
