@@ -65,6 +65,24 @@ def test_complete_subset_ignores_incomplete_rows(base_cfg):
     assert (f1.loc["all", "diff"] > 0).all()
 
 
+def test_drop_reduction_rewards_the_run_that_degrades_less(base_cfg):
+    p = _preds(base_cfg)
+    rng = np.random.default_rng(3)
+    robust, fragile = p.copy(), p.copy()
+    robust["y_pred"] = p["y_true"]                                     # perfect at every rate
+    noisy = rng.integers(0, 6, len(p))
+    fragile["y_pred"] = np.where(p["missingness"] == 0, p["y_true"], noisy)  # perfect only when clean
+    t = compare_predictions(robust, fragile, _cfg(base_cfg))
+    drop = t[t["metric"] == "macro_f1_drop_reduction"]
+    assert set(drop["missingness"]) == {0.3}                           # no drop row for the clean rate
+    assert (drop["a_value"] == 0).all() and (drop["b_value"] > 0.5).all()
+    assert (drop["diff"] > 0.5).all() and (drop["ci_low"] > 0).all()
+    rev = compare_predictions(fragile, robust, _cfg(base_cfg))
+    rdrop = rev[rev["metric"] == "macro_f1_drop_reduction"]
+    assert np.allclose(rdrop["diff"].to_numpy(), -drop["diff"].to_numpy())
+    assert (rdrop["ci_high"] < 0).all()
+
+
 def test_mismatched_inputs_are_refused(base_cfg):
     p = _preds(base_cfg)
     p["y_pred"] = 0

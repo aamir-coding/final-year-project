@@ -8,6 +8,10 @@ for every subset in eval.subsets and every missingness rate, reports metric(A) -
 with a paired, patient-clustered bootstrap CI (`stats.paired_bootstrap_diff`). The mask
 seeds of one rate are pooled: a resampled patient brings all of its rows from every seed.
 
+It also tests degradation directly: `<metric>_drop_reduction` rows give
+(B's drop - A's drop) from the clean rate to each masked rate, bootstrapping patients once for
+both conditions so each patient is their own control. Positive = A degrades less.
+
 Output: results/compare/<a>_vs_<b>_<split>.csv with one row per (subset, missingness, metric).
 A CI that includes 0 means "no clear difference" (docs/CLAIMS_GUARDRAIL.md).
 """
@@ -51,29 +55,74 @@ def align_predictions(pred_a: pd.DataFrame, pred_b: pd.DataFrame) -> pd.DataFram
     return m.rename(columns={"y_pred": "y_pred_a"})
 
 
+def drop_reduction(clean: pd.DataFrame, masked: pd.DataFrame, fn, key: str, n_resamples: int,
+                   ci: float, seed: int, group_col: str | None) -> dict[str, float]:
+    """How much less A degrades than B from the clean rows to the masked rows:
+    (B_clean - B_masked) - (A_clean - A_masked). Positive = A loses less. Patients are
+    resampled once per bootstrap draw and bring their rows from both conditions, so each
+    patient is their own control. `p_le_0` = fraction of draws where A is not more robust."""
+    cols = ("y_true", "y_pred_a", "y_pred_b")
+    c_arr = [clean[c].to_numpy() for c in cols]
+    m_arr = [masked[c].to_numpy() for c in cols]
+
+    def stat(ci_: np.ndarray, mi_: np.ndarray) -> float:
+        ct, ca, cb = (x[ci_] for x in c_arr)
+        mt, ma, mb = (x[mi_] for x in m_arr)
+        return (fn(ct, cb)[key] - fn(mt, mb)[key]) - (fn(ct, ca)[key] - fn(mt, ma)[key])
+
+    point = stat(np.arange(len(clean)), np.arange(len(masked)))
+    if group_col is None:  # resample images: the image id plays the role of the group
+        group_col = "img_id"
+    cg, mg = clean[group_col].to_numpy(), masked[group_col].to_numpy()
+    groups = np.union1d(cg, mg)
+    c_idx = {g: np.flatnonzero(cg == g) for g in groups}
+    m_idx = {g: np.flatnonzero(mg == g) for g in groups}
+    rng = np.random.default_rng(seed)
+    draws = np.empty(n_resamples)
+    for b in range(n_resamples):
+        pick = groups[rng.integers(0, len(groups), size=len(groups))]
+        draws[b] = stat(np.concatenate([c_idx[g] for g in pick]),
+                        np.concatenate([m_idx[g] for g in pick]))
+    alpha = (1.0 - ci) / 2.0
+    return {"diff": float(point), "ci_low": float(np.quantile(draws, alpha)),
+            "ci_high": float(np.quantile(draws, 1 - alpha)), "p_le_0": float((draws <= 0).mean())}
+
+
 def compare_predictions(pred_a: pd.DataFrame, pred_b: pd.DataFrame, cfg: dict,
                         metrics=DEFAULT_METRICS) -> pd.DataFrame:
-    """Tidy table: subset, missingness, metric, a_value, b_value, diff, ci_low, ci_high, p_le_0."""
+    """Tidy table: subset, missingness, metric, a_value, b_value, diff, ci_low, ci_high, p_le_0.
+    Rows with metric `<m>` compare levels at one rate (A - B); rows with metric `<m>_drop_reduction`
+    compare degradation from the lowest rate to this rate (positive = A degrades less)."""
     ev, d = cfg["eval"], cfg["data"]
     m = align_predictions(pred_a, pred_b)
     fn = lambda yt, yp: compute_metrics(yt, yp, d["classes"], d["malignant"])  # noqa: E731
     group_col = ev.get("bootstrap_group")
+    boot = (int(ev["bootstrap_resamples"]), float(ev["ci_level"]), int(ev["bootstrap_seed"]))
     rows = []
     for subset in ev["subsets"]:
         in_subset = _subset_rows(m, subset)
-        for rate in sorted(m["missingness"].unique()):
+        rates = sorted(m["missingness"].unique())
+        clean = m[in_subset & (m["missingness"] == rates[0]).to_numpy()]
+        for rate in rates:
             sel = m[in_subset & (m["missingness"] == rate).to_numpy()]
             if sel.empty:
                 continue
             yt, ya, yb = (sel[c].to_numpy() for c in ("y_true", "y_pred_a", "y_pred_b"))
             groups = sel[group_col].to_numpy() if group_col else None
             pa, pb = fn(yt, ya), fn(yt, yb)
+            base = {"subset": subset, "missingness": float(rate), "n_rows": len(sel),
+                    "n_mask_seeds": int(sel["mask_seed"].nunique())}
             for k in metrics:
-                r = paired_bootstrap_diff(yt, ya, yb, fn, k, int(ev["bootstrap_resamples"]),
-                                          float(ev["ci_level"]), int(ev["bootstrap_seed"]), groups)
-                rows.append({"subset": subset, "missingness": float(rate), "metric": k,
-                             "n_rows": len(sel), "n_mask_seeds": int(sel["mask_seed"].nunique()),
-                             "a_value": pa[k], "b_value": pb[k], **r})
+                r = paired_bootstrap_diff(yt, ya, yb, fn, k, *boot, groups)
+                rows.append({**base, "metric": k, "a_value": pa[k], "b_value": pb[k], **r})
+            if rate == rates[0] or clean.empty:
+                continue
+            pa0 = fn(clean["y_true"].to_numpy(), clean["y_pred_a"].to_numpy())
+            pb0 = fn(clean["y_true"].to_numpy(), clean["y_pred_b"].to_numpy())
+            for k in metrics:
+                r = drop_reduction(clean, sel, fn, k, *boot, group_col)
+                rows.append({**base, "metric": f"{k}_drop_reduction",
+                             "a_value": pa0[k] - pa[k], "b_value": pb0[k] - pb[k], **r})
     return pd.DataFrame(rows)
 
 
