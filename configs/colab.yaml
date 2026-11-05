@@ -1,0 +1,16 @@
+_base_: default.yaml            # inherit every setting; only paths and runtime change (both excluded from the config hash)
+# Google Colab. Used by colab/MAMG_colab.ipynb, which:
+#   - clones the repo to /content/repo and runs from there (results/ and splits/ resolve inside the clone),
+#   - copies data/raw/metadata.csv into the clone and unzips the resized images to /content/mamg_data
+#     (local disk: much faster than reading 2,298 files from Drive every epoch),
+#   - keeps checkpoints on the shared Google Drive folder, so a disconnect loses at most one epoch.
+# Every team member adds a shortcut to the shared "MAMG" folder in their own My Drive (docs/COLAB.md).
+
+paths:
+  image_dir: /content/mamg_data/processed
+  image_cache_dir: ""                                  # image_dir already is the 256-px cache
+  checkpoints_dir: /content/drive/MyDrive/MAMG/checkpoints
+
+runtime:
+  device: cuda                  # fail loudly on a CPU runtime instead of silently training on CPU
+  num_workers: 2                # Colab VMs have 2 vCPUs

@@ -63,6 +63,8 @@ Team: Aamir Mohammed Khan (data/tabular), Chirag G K (model/training), Giridhar 
 - Before anyone runs `--final-test`: pull, check results/final_test_lock.csv, run it,
   then commit and push the lock file immediately so the other laptop cannot repeat it.
 - Never commit data/, checkpoints/, *.pt, tmp/, kaggle_output/, kaggle.json or tokens.
+- Shared compute: Google Colab via colab/MAMG_colab.ipynb + configs/colab.yaml; data and checkpoints live in the
+  shared Google Drive folder MAMG (docs/COLAB.md). One driver at a time still applies.
 - data/ is gitignored: each laptop needs its own copy (see "Setting up a new laptop" in
   STATE.md). splits/split_seed42.csv is committed and must never be regenerated.
 

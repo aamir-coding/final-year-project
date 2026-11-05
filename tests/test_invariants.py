@@ -4,6 +4,7 @@ import inspect
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 import mamg.train
 import mamg.xai_eval
@@ -41,6 +42,18 @@ def test_committed_results_contain_no_synthetic_rows():
         if "data_kind" in df.columns:
             assert set(df["data_kind"].dropna()) <= {"REAL"}, csv
     assert not list((ROOT / "results").rglob("*SYNTHETIC*"))
+
+
+@pytest.mark.parametrize("name", ["kaggle.yaml", "colab.yaml", "local.example.yaml"])
+def test_platform_configs_keep_the_experiment_hash(name):
+    """Platform configs may only move files and pick a device; a run on Colab or Kaggle must
+    share its config hash (and so its run name and resumable checkpoint) with the same run anywhere."""
+    from mamg.config import load_config
+    default = load_config(ROOT / "configs" / "default.yaml")
+    other = load_config(ROOT / "configs" / name)
+    assert config_hash(other) == config_hash(default)
+    changed = {k for k in set(default) | set(other) if default.get(k) != other.get(k)}
+    assert changed <= {"paths", "runtime"}, changed
 
 
 def test_config_hash_ignores_paths_runtime_and_seed(base_cfg):

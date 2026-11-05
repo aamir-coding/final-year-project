@@ -1,5 +1,8 @@
 # STATE.md — single source of truth for progress
 
+## Where to work now: Google Colab (added 2026-11-05)
+The project no longer depends on Chirag's laptop. Data and the 14 trained models live in the shared Google Drive folder **MAMG**; open `colab/MAMG_colab.ipynb` in Colab and follow `docs/COLAB.md` (one-time setup, every-session steps, and the do's and don'ts that keep us inside the free GPU limits). Nothing needs retraining: the state below (M3 done) is complete in git plus the Drive folder. Next step is still M4 (notebook cell 6c).
+
 ## Relay handover — 2026-10-17, Chirag G K → next driver
 
 **Milestone reached: M3 done, ~70%** (start of this turn: ~35%, end of M0). Last commit before this handover: `d3e7749`. Nothing is running; the working tree is clean.
@@ -108,7 +111,8 @@ None. (Resolved 2026-10-17: Chirag's laptop GPU dropped off the bus at ~07:04 wi
    and "split file exists, not overwritten"). Alternatively copy Aamir's data/raw/metadata.csv and
    data/processed/ (223 MB) via a drive. Never pass --force-split.
 5. Re-run `python -m pytest -q` (real-data tests now run too).
-6. If the repo is inside OneDrive: keep the venv, images and checkpoints outside it. Copy
+6. On Google Colab instead of a laptop: skip steps 1-5 and follow `docs/COLAB.md`.
+7. If the repo is inside OneDrive: keep the venv, images and checkpoints outside it. Copy
    `configs/local.example.yaml` to `configs/local.yaml` (gitignored), set your paths, and pass
    `--config configs/local.yaml`. Windows + CUDA needs a large page file (system-managed).
 
