@@ -20,8 +20,8 @@ The project no longer depends on one laptop. Three places hold everything:
 
 ### Every team member, once
 1. Accept the Drive share, then in **Shared with me** right-click **MAMG** → **Organize** → **Add shortcut** → **My Drive**. The notebook expects `/content/drive/MyDrive/MAMG`.
-2. To push from Colab, you need push access to the GitHub repo (the repo owner adds you under Settings → Collaborators) and a token:
-   GitHub → Settings → Developer settings → Fine-grained tokens → Generate. Repository access: only `aamir-coding/final-year-project`. Permissions: **Contents: Read and write**. Expiry: 90 days.
+2. To push from Colab you need (a) push access to the repo: it belongs to Aamir (`aamir-coding`), so **only Aamir** can add a missing teammate under the repo's Settings → Collaborators (anyone who has already pushed has access); and (b) a **classic** token. Fine-grained tokens cannot select a repository owned by another person's account, so they do not work here.
+   GitHub → profile picture → Settings → Developer settings → Personal access tokens → **Tokens (classic)** → Generate new token (classic). Note: `MAMG Colab`. Expiration: 90 days. Scopes: tick only **`repo`**. This scope can write to all your repositories, so the token goes only into Colab Secrets; revoke it on GitHub if it ever leaks. (No token? Do GPU work on Colab and commit the small result files from a laptop.)
 3. In Colab, open the key icon (Secrets) on the left and add `GITHUB_TOKEN` (the token), `GIT_NAME` and `GIT_EMAIL` (as used on GitHub). Turn on "Notebook access" for each. Never paste a token into a cell, a file or a chat.
 
 ### Opening the notebook
